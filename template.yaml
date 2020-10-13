@@ -1,0 +1,244 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'virtual-slide-viewer-backend
+
+  SAM Template for virtual-slide-viewer-backend
+
+  '
+Parameters:
+  EnvType:
+    Description: Runtime environment type.
+    Default: dev
+    Type: String
+    AllowedValues: [prod, dev, test]
+    ConstraintDescription: must specify prod, dev, or test.
+  StageName:
+    Description: Deployment stage name.
+    Type: String
+  AllowOrigin:
+    Description: CORS allowed origin.
+    Default: 'https://pathology.cptac.vai.org'
+    Type: String
+  ImagesPath:
+    Description: File system path to image files.
+    Default: '/mnt/lambda'
+    Type: String
+  ImagesBucket:
+    Description: Source bucket for image files.
+    Default: 'cptac-path-images'
+    Type: String
+
+Conditions:
+  UseStageName: !Not [!Equals [!Ref StageName, '']]
+
+Globals:
+  Api:
+    OpenApiVersion: '3.0.3'
+  Function:
+    Environment:
+      Variables:
+        ALLOW_ORIGIN: !Ref AllowOrigin
+        IMAGES_PATH: !Ref ImagesPath
+        IMAGES_BUCKET: !Ref ImagesBucket
+
+Resources:
+  EfsLambdaVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      Tags: 
+        - Key: 'Name'
+          Value: 'VirtualSlideViewer'
+  EfsLambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: EFS + Lambda on SAM Security Group
+      VpcId: !Ref EfsLambdaVpc
+      SecurityGroupEgress:
+      - CidrIp: '0.0.0.0/0'
+        FromPort: 0
+        ToPort: 65535
+        IpProtocol: tcp
+      SecurityGroupIngress:
+      - CidrIp: '0.0.0.0/0'
+        FromPort: 0
+        ToPort: 65535
+        IpProtocol: tcp
+  EfsLambdaSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref EfsLambdaVpc
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      MapPublicIpOnLaunch: false
+      CidrBlock: 10.0.0.0/24
+  EfsLambdaSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref EfsLambdaVpc
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      MapPublicIpOnLaunch: false
+      CidrBlock: 10.0.1.0/24
+  EfsFileSystem:
+    Type: AWS::EFS::FileSystem
+  MountTargetA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EfsFileSystem
+      SubnetId: !Ref EfsLambdaSubnetA
+      SecurityGroups: [!Ref EfsLambdaSecurityGroup]
+  MountTargetB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EfsFileSystem
+      SubnetId: !Ref EfsLambdaSubnetB
+      SecurityGroups: [!Ref EfsLambdaSecurityGroup]
+  AccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Properties:
+      FileSystemId: !Ref EfsFileSystem
+      PosixUser:
+        Gid: '1000'
+        Uid: '1000'
+      RootDirectory:
+        Path: /lambda
+        CreationInfo:
+          OwnerGid: '1000'
+          OwnerUid: '1000'
+          Permissions: '755'
+  S3Endpoint:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action:
+              - 's3:GetObject'
+              - 's3:HeadObject'
+              - 's3:ListBucket'
+              - 's3:GetBucketLocation'
+              - 's3:GetObjectVersion'
+              - 's3:GetLifecycleConfiguration'
+            Resource:
+              - !Sub 'arn:aws:s3:::${ImagesBucket}'
+              - !Sub 'arn:aws:s3:::${ImagesBucket}/*'
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcEndpointType: Gateway
+      VpcId: !Ref EfsLambdaVpc
+  CloudWatchLogsVpcPrivateEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: 'true'
+      VpcEndpointType: Interface
+      VpcId: !Ref EfsLambdaVpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.logs
+      SecurityGroupIds:
+        - !Ref EfsLambdaSecurityGroup
+      SubnetIds:
+        - !Ref EfsLambdaSubnetA
+        - !Ref EfsLambdaSubnetB
+  TransferImageFunction:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - MountTargetA
+      - MountTargetB
+    Properties:
+      CodeUri: transfer_file
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Timeout: 300
+      MemorySize: 3008
+      Policies:
+        - EFSWriteAccessPolicy:
+            FileSystem: !Ref EfsFileSystem
+            AccessPoint: !Ref AccessPoint
+        - S3ReadPolicy:
+            BucketName: !Ref ImagesBucket
+      VpcConfig:
+        SecurityGroupIds:
+          - Ref: EfsLambdaSecurityGroup
+        SubnetIds:
+          - !Ref EfsLambdaSubnetA
+          - !Ref EfsLambdaSubnetB
+      FileSystemConfigs:
+        - Arn: !GetAtt AccessPoint.Arn
+          LocalMountPath: /mnt/lambda
+      Events:
+        ImagesApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ImagesApi
+            Path: /transferFile/{svsFile}
+            Method: POST
+  ImageRequestFunction:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - MountTargetA
+      - MountTargetB
+    Properties:
+      CodeUri: svs2vsv
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Timeout: 15
+      MemorySize: 512
+      AutoPublishAlias: head
+      Layers:
+        - !Ref OpenSlide
+        - !Ref PillowSIMD
+        - !Sub "arn:aws:lambda:${AWS::Region}:580247275435:layer:LambdaInsightsExtension:2"
+      Policies:
+        - EFSWriteAccessPolicy:
+            FileSystem: !Ref EfsFileSystem
+            AccessPoint: !Ref AccessPoint
+        - CloudWatchLambdaInsightsExecutionRolePolicy
+      VpcConfig:
+        SecurityGroupIds:
+          - Ref: EfsLambdaSecurityGroup
+        SubnetIds:
+          - !Ref EfsLambdaSubnetA
+          - !Ref EfsLambdaSubnetB
+      FileSystemConfigs:
+          - Arn: !GetAtt AccessPoint.Arn
+            LocalMountPath: /mnt/lambda
+      Events:
+        ImagesApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ImagesApi
+            Path: /images/{imagePath+}
+            Method: GET
+  OpenSlide:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: openslide
+      CompatibleRuntimes:
+        - python3.8
+    Metadata:
+      BuildMethod: makefile
+  PillowSIMD:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: pillow-simd
+      CompatibleRuntimes:
+        - python3.8
+    Metadata:
+      BuildMethod: makefile
+  ImagesApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref StageName
+      BinaryMediaTypes: ['*/*']
+      EndpointConfiguration:
+        Type: REGIONAL
+      
+Outputs:
+  ApiUrl:
+    Description: URL of your API endpoint
+    Value: !If
+      - UseStageName
+      - !Sub https://${ImagesApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/${StageName}/
+      - !Sub https://${ImagesApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/]
+  ApiId:
+    Description: Api id of ImagesApi
+    Value: !Ref ImagesApi

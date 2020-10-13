@@ -1,0 +1,44 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "VirtualSlideViewer"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-3okyxt2msf06"
+s3_prefix = "vsv-backend-dev"
+region = "us-east-2"
+confirm_changeset = false
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "EnvType=\"dev\" StageName=\"dev\" AllowOrigin=\"http://localhost:8080\" ImagesPath=\"/mnt/lambda\""
+
+[dev]
+[dev.deploy]
+[dev.deploy.parameters]
+stack_name = "VirtualSlideViewer"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-3okyxt2msf06"
+s3_prefix = "vsv-backend-dev"
+region = "us-east-2"
+confirm_changeset = false
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "EnvType=\"dev\" StageName=\"dev\" AllowOrigin=\"https://pathology.cptac.vai.org/dev\""
+
+[test]
+[test.deploy]
+[test.deploy.parameters]
+stack_name = "VirtualSlideViewer"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-3okyxt2msf06"
+s3_prefix = "vsv-backend-test"
+region = "us-east-2"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "EnvType=\"test\" StageName=\"test\" AllowOrigin=\"https://pathology.cptac.vai.org/test\""
+
+[prod]
+[prod.deploy]
+[prod.deploy.parameters]
+stack_name = "VirtualSlideViewer"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-3okyxt2msf06"
+s3_prefix = "vsv-backend-prod"
+region = "us-east-2"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "EnvType=\"prod\" StageName=\"prod\""
