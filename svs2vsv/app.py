@@ -6,6 +6,7 @@ from io import BytesIO
 import openslide
 from openslide import ImageSlide, open_slide
 from openslide.deepzoom import DeepZoomGenerator
+import boto3
 
 DEEPZOOM_FORMAT = 'jpeg'
 DEEPZOOM_TILE_SIZE = 254
@@ -58,24 +59,40 @@ def get_tile(image_id, level, col, row, format):
     tile.save(buf, format, quality=DEEPZOOM_TILE_QUALITY)
     return respond(base64.b64encode(buf.getvalue()), content_type=f'image/{format}')
 
+s3 = boto3.resource('s3')
+
 def lambda_handler(event, context):
     try:
-        resource_path = event['path']
-        request = re.match(r'/images/(?P<image_id>\w+)((?P<ext>\.dzi)|_files/(?P<level>\d{1,2})/(?P<col>\d{1,3})_(?P<row>\d{1,3})\.(?P<format>jpeg|png))', resource_path)
+        image_path = event['pathParameters']['imagePath']
+        # 170782/DeepZoom.dzi
+        # 170782/DeepZoom_files/14/15_16.jpeg
+        # 170782.dzi
+        # 170782_files/14/15_15.jpeg
+        request = re.match(r'(?P<image_id>\w+)(/DeepZoom)?((?P<ext>\.dzi)|_files/(?P<level>\d{1,2})/(?P<col>\d{1,3})_(?P<row>\d{1,3})\.(?P<format>jpeg|png))', image_path)
         if not request:
-            raise ValueError(f'Bad resource request: {resource_path}')
+            raise ValueError(f'Bad resource request: {image_path}')
 
+        ext = request.group('ext')
+        format = request.group('format')
+        if '/DeepZoom' in image_path:
+            obj = s3.Object('cptac-path-viewing', image_path)
+            if ext == '.dzi':
+                result = obj.get()['Body'].read().decode('utf-8') 
+                return respond(result, content_type='application/xml')
+            else:
+                result = obj.get()['Body'].read()
+                return respond(base64.b64encode(result), content_type=f'image/{format}')
+        
         image_id = request.group('image_id')
         if not image_id in slides:
             load_slide(image_id)
         
-        if request.group('ext') == '.dzi':
+        if ext == '.dzi':
             return get_dzi(image_id)
 
         level = int(request.group('level'))
         col = int(request.group('col'))
         row = int(request.group('row'))
-        format = request.group('format')
         return get_tile(image_id, level, col, row, format)
     except Exception as e:
         return respond(None, e, 400)

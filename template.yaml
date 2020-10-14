@@ -17,15 +17,10 @@ Parameters:
     Type: String
   AllowOrigin:
     Description: CORS allowed origin.
-    Default: 'https://pathology.cptac.vai.org'
     Type: String
   ImagesPath:
     Description: File system path to image files.
     Default: '/mnt/lambda'
-    Type: String
-  ImagesBucket:
-    Description: Source bucket for image files.
-    Default: 'cptac-path-images'
     Type: String
 
 Conditions:
@@ -39,7 +34,6 @@ Globals:
       Variables:
         ALLOW_ORIGIN: !Ref AllowOrigin
         IMAGES_PATH: !Ref ImagesPath
-        IMAGES_BUCKET: !Ref ImagesBucket
 
 Resources:
   EfsLambdaVpc:
@@ -121,8 +115,8 @@ Resources:
               - 's3:GetObjectVersion'
               - 's3:GetLifecycleConfiguration'
             Resource:
-              - !Sub 'arn:aws:s3:::${ImagesBucket}'
-              - !Sub 'arn:aws:s3:::${ImagesBucket}/*'
+              - !Sub 'arn:aws:s3:::*'
+              - !Sub 'arn:aws:s3:::*/*'
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
       VpcEndpointType: Gateway
       VpcId: !Ref EfsLambdaVpc
@@ -144,17 +138,17 @@ Resources:
       - MountTargetA
       - MountTargetB
     Properties:
-      CodeUri: transfer_file
-      Handler: app.lambda_handler
+      CodeUri: transfer_image
+      Handler: app.transfer_s3_objects
       Runtime: python3.8
-      Timeout: 300
+      Timeout: 900
       MemorySize: 3008
       Policies:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref EfsFileSystem
             AccessPoint: !Ref AccessPoint
         - S3ReadPolicy:
-            BucketName: !Ref ImagesBucket
+            BucketName: '*'
       VpcConfig:
         SecurityGroupIds:
           - Ref: EfsLambdaSecurityGroup
@@ -169,7 +163,7 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref ImagesApi
-            Path: /transferFile/{svsFile}
+            Path: /transfer_s3_objects/{bucket}/{prefix}
             Method: POST
   ImageRequestFunction:
     Type: AWS::Serverless::Function
