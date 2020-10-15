@@ -6,7 +6,6 @@ from io import BytesIO
 import openslide
 from openslide import ImageSlide, open_slide
 from openslide.deepzoom import DeepZoomGenerator
-import boto3
 
 DEEPZOOM_FORMAT = 'jpeg'
 DEEPZOOM_TILE_SIZE = 254
@@ -59,8 +58,6 @@ def get_tile(image_id, level, col, row, format):
     tile.save(buf, format, quality=DEEPZOOM_TILE_QUALITY)
     return respond(base64.b64encode(buf.getvalue()), content_type=f'image/{format}')
 
-s3 = boto3.resource('s3')
-
 def lambda_handler(event, context):
     try:
         image_path = event['pathParameters']['imagePath']
@@ -75,12 +72,11 @@ def lambda_handler(event, context):
         ext = request.group('ext')
         format = request.group('format')
         if '/DeepZoom' in image_path:
-            obj = s3.Object('cptac-path-viewing', image_path)
             if ext == '.dzi':
-                result = obj.get()['Body'].read().decode('utf-8') 
+                result = open(os.path.join(IMAGES_PATH, image_path)).read()
                 return respond(result, content_type='application/xml')
             else:
-                result = obj.get()['Body'].read()
+                result = open(os.path.join(IMAGES_PATH, image_path), 'rb').read()
                 return respond(base64.b64encode(result), content_type=f'image/{format}')
         
         image_id = request.group('image_id')

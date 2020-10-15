@@ -21,3 +21,13 @@ The infrastructure code is currently a SAM template.
 
 ## Related projects
 - [Virtual Slide Viewer frontend](https://github.com/VanAndelInstitute/virtual-slide-viewer)
+
+## Performance testing
+| Configuration                               | Python 3.8 | Pillow-SIMD | OpenSlide | Lambda | EFS | Is it fast? | Link to code     | Resource format                 |
+|---------------------------------------------|------------|-------------|-----------|--------|-----|-------------|------------------|---------------------------------|
+| Lambda+Python+SVS images on EFS             | x          | x           | x         | x      | x   | No          | VSV              | /images/170782.dzi              |
+| Lambda+Python+S3 DeepZoom pyramid files     | x          |             |           | x      |     | Yes         | VSV              | /images/170782/DeepZoom.dzi     |
+| Lambda+Python+DeepZoom pyramid files on EFS | x          |             |           | x      | x   | Yes         |                  | /images/170782/DeepZoom.dzi     |
+| EC2+Python+SVS images on EFS                | x          | x           | x         |        | x   | No          | openslide-python | /slide.dzi                      |
+| EC2+Python+DeepZoom pyramid files on EFS    | x          |             |           |        | x   | Yes         | VSV              | /170782/DeepZoom.dzi            |
+| EC2+Python+SVS images on EBS                | x          | x           | x         |        |     | No          | openslide-python | /slide.dzi                      |
