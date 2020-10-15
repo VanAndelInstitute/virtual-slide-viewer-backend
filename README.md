@@ -31,4 +31,4 @@ The infrastructure code is currently a SAM template.
 | EC2+Python+SVS images on EFS                | x          | x           | x         |        | x   | No          | 
 | EC2+Python+DeepZoom pyramid files on EFS    | x          |             |           |        | x   | Yes         | 
 | EC2+Python+SVS images on EBS                | x          | x           | x         |        |     | No          | 
-| EC2+IIPServer+SVS images on EFS             |            |             | x         |        | x   | ??          | 
+| EC2+IIPServer+SVS images on EFS             |            |             | x         |        | x   | Yes         | 
