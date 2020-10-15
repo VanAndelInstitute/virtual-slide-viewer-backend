@@ -23,12 +23,12 @@ The infrastructure code is currently a SAM template.
 - [Virtual Slide Viewer frontend](https://github.com/VanAndelInstitute/virtual-slide-viewer)
 
 ## Performance testing
-| Configuration                               | Python 3.8 | Pillow-SIMD | OpenSlide | Lambda | EFS | Is it fast? | 
-|---------------------------------------------|------------|-------------|-----------|--------|-----|-------------|
-| Lambda+Python+SVS images on EFS             | x          | x           | x         | x      | x   | No          | 
-| Lambda+Python+S3 DeepZoom pyramid files     | x          |             |           | x      |     | Yes         | 
-| Lambda+Python+DeepZoom pyramid files on EFS | x          |             |           | x      | x   | Yes         | 
-| EC2+Python+SVS images on EFS                | x          | x           | x         |        | x   | No          | 
-| EC2+Python+DeepZoom pyramid files on EFS    | x          |             |           |        | x   | Yes         | 
-| EC2+Python+SVS images on EBS                | x          | x           | x         |        |     | No          | 
-| EC2+IIPServer+SVS images on EFS             |            |             | x         |        | x   | Yes         | 
+| Configuration                               | Python 3.8 | Pillow-SIMD | OpenSlide | Lambda | EFS | Rank (1=fastest) | 
+|---------------------------------------------|------------|-------------|-----------|--------|-----|------------------|
+| Lambda+Python+SVS images on EFS             | x          | x           | x         | x      | x   | 10               | 
+| Lambda+Python+S3 DeepZoom pyramid files     | x          |             |           | x      |     | 2                | 
+| Lambda+Python+DeepZoom pyramid files on EFS | x          |             |           | x      | x   | 1                | 
+| EC2+Python+SVS images on EFS                | x          | x           | x         |        | x   | 10               | 
+| EC2+Python+DeepZoom pyramid files on EFS    | x          |             |           |        | x   | 1.5              | 
+| EC2+Python+SVS images on EBS                | x          | x           | x         |        |     | 10               | 
+| EC2+IIPServer+SVS images on EFS             |            |             | x         |        | x   | 5                | 
