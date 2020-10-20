@@ -19,7 +19,7 @@ s3_prefix = "vsv-backend-dev"
 region = "us-east-2"
 confirm_changeset = false
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "EnvType=\"dev\" StageName=\"dev\" AllowOrigin=\"https://pathology.cptac.vai.org/dev\""
+parameter_overrides = "EnvType=\"dev\" StageName=\"dev\" AllowOrigin=\"https://pathology.cptac.vai.org\" ImagesPath=\"/mnt/lambda\""
 
 [test]
 [test.deploy]
@@ -30,7 +30,7 @@ s3_prefix = "vsv-backend-test"
 region = "us-east-2"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "EnvType=\"test\" StageName=\"test\" AllowOrigin=\"https://pathology.cptac.vai.org/test\""
+parameter_overrides = "EnvType=\"test\" StageName=\"test\" AllowOrigin=\"https://pathology.cptac.vai.org\" ImagesPath=\"/mnt/lambda\""
 
 [prod]
 [prod.deploy]
@@ -41,4 +41,4 @@ s3_prefix = "vsv-backend-prod"
 region = "us-east-2"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "EnvType=\"prod\" StageName=\"prod\""
+parameter_overrides = "EnvType=\"prod\" StageName=\"prod\" AllowOrigin=\"https://pathology.cptac.vai.org\" ImagesPath=\"/mnt/lambda\""
