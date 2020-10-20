@@ -69,7 +69,7 @@ class CachedDeepZoomGenerator(DeepZoomGenerator):
                    tuple."""
         col, row = address
         file_path = os.path.join(IMAGES_PATH, f'{self.image_id}_files/{level}/{col}_{row}.{self.format}')
-        if os.path.exists(file_path):
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
             # cache hit
             return Image.open(file_path)
     
@@ -165,7 +165,7 @@ def lambda_handler(event, context):
         row = int(request.group('row'))
         _format = request.group('format')
         file_path = os.path.join(IMAGES_PATH, f'{image_id}_files/{level}/{col}_{row}.{_format}')
-        if os.path.exists(file_path):
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
             # cache hit
             result = open(file_path, 'rb').read()
         else:
