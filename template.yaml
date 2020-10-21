@@ -173,8 +173,8 @@ Resources:
       - MountTargetA
       - MountTargetB
     Properties:
-      CodeUri: svs2vsv
-      Handler: app.lambda_handler
+      CodeUri: DeepZoom
+      Handler: app.image_request_handler
       Runtime: python3.8
       Timeout: 15
       MemorySize: 512
@@ -202,7 +202,7 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref ImagesApi
-            Path: /images/{imagePath+}
+            Path: /DeepZoom/{imagePath+}
             Method: GET
   GenerateTilesFunction:
     Type: AWS::Serverless::Function
@@ -210,8 +210,8 @@ Resources:
       - MountTargetA
       - MountTargetB
     Properties:
-      CodeUri: svs2vsv
-      Handler: app.generate_tiles
+      CodeUri: DeepZoom
+      Handler: app.generate_tiles_handler
       Runtime: python3.8
       Timeout: 60
       MemorySize: 128
