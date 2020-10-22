@@ -6,6 +6,12 @@ Description: 'virtual-slide-viewer-backend
 
   '
 Parameters:
+  VpcId:
+    Type: String
+    Description: 'ID of your existing Virtual Private Cloud (VPC)'
+  SubnetIds:
+    Type: CommaDelimitedList
+    Description: 'The list of Subnet IDs, for at least two Availability Zones in the region in your Virtual Private Cloud (VPC)'
   EnvType:
     Description: Runtime environment type.
     Default: dev
@@ -38,18 +44,11 @@ Globals:
         ENV_TYPE: !Ref EnvType
 
 Resources:
-  EfsLambdaVpc:
-    Type: AWS::EC2::VPC
-    Properties:
-      CidrBlock: 10.0.0.0/16
-      Tags: 
-        - Key: 'Name'
-          Value: 'VirtualSlideViewer'
   EfsLambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: EFS + Lambda on SAM Security Group
-      VpcId: !Ref EfsLambdaVpc
+      VpcId: !Ref VpcId
       SecurityGroupEgress:
       - CidrIp: '0.0.0.0/0'
         FromPort: 0
@@ -60,33 +59,23 @@ Resources:
         FromPort: 0
         ToPort: 65535
         IpProtocol: tcp
-  EfsLambdaSubnetA:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref EfsLambdaVpc
-      AvailabilityZone: !Select [ 0, !GetAZs '' ]
-      MapPublicIpOnLaunch: false
-      CidrBlock: 10.0.0.0/24
-  EfsLambdaSubnetB:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref EfsLambdaVpc
-      AvailabilityZone: !Select [ 1, !GetAZs '' ]
-      MapPublicIpOnLaunch: false
-      CidrBlock: 10.0.1.0/24
   EfsFileSystem:
     Type: AWS::EFS::FileSystem
+    Properties:
+      Tags: 
+        - Key: 'Name'
+          Value: 'VirtualSlideViewer'
   MountTargetA:
     Type: AWS::EFS::MountTarget
     Properties:
       FileSystemId: !Ref EfsFileSystem
-      SubnetId: !Ref EfsLambdaSubnetA
+      SubnetId: !Select [ 0, !Ref SubnetIds ]
       SecurityGroups: [!Ref EfsLambdaSecurityGroup]
   MountTargetB:
     Type: AWS::EFS::MountTarget
     Properties:
       FileSystemId: !Ref EfsFileSystem
-      SubnetId: !Ref EfsLambdaSubnetB
+      SubnetId: !Select [ 1, !Ref SubnetIds ]
       SecurityGroups: [!Ref EfsLambdaSecurityGroup]
   AccessPoint:
     Type: AWS::EFS::AccessPoint
@@ -121,19 +110,17 @@ Resources:
               - !Sub 'arn:aws:s3:::*/*'
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
       VpcEndpointType: Gateway
-      VpcId: !Ref EfsLambdaVpc
+      VpcId: !Ref VpcId
   CloudWatchLogsVpcPrivateEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
       PrivateDnsEnabled: 'true'
       VpcEndpointType: Interface
-      VpcId: !Ref EfsLambdaVpc
+      VpcId: !Ref VpcId
       ServiceName: !Sub com.amazonaws.${AWS::Region}.logs
       SecurityGroupIds:
         - !Ref EfsLambdaSecurityGroup
-      SubnetIds:
-        - !Ref EfsLambdaSubnetA
-        - !Ref EfsLambdaSubnetB
+      SubnetIds: !Ref SubnetIds
   TransferImageFunction:
     Type: AWS::Serverless::Function
     DependsOn:
@@ -154,9 +141,7 @@ Resources:
       VpcConfig:
         SecurityGroupIds:
           - Ref: EfsLambdaSecurityGroup
-        SubnetIds:
-          - !Ref EfsLambdaSubnetA
-          - !Ref EfsLambdaSubnetB
+        SubnetIds: !Ref SubnetIds
       FileSystemConfigs:
         - Arn: !GetAtt AccessPoint.Arn
           LocalMountPath: /mnt/lambda
@@ -178,7 +163,6 @@ Resources:
       Runtime: python3.8
       Timeout: 15
       MemorySize: 512
-      AutoPublishAlias: !Ref StageName
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
@@ -191,9 +175,7 @@ Resources:
       VpcConfig:
         SecurityGroupIds:
           - Ref: EfsLambdaSecurityGroup
-        SubnetIds:
-          - !Ref EfsLambdaSubnetA
-          - !Ref EfsLambdaSubnetB
+        SubnetIds: !Ref SubnetIds
       FileSystemConfigs:
           - Arn: !GetAtt AccessPoint.Arn
             LocalMountPath: /mnt/lambda
@@ -215,7 +197,6 @@ Resources:
       Runtime: python3.8
       Timeout: 60
       MemorySize: 128
-      AutoPublishAlias: !Ref StageName
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
@@ -228,9 +209,7 @@ Resources:
       VpcConfig:
         SecurityGroupIds:
           - Ref: EfsLambdaSecurityGroup
-        SubnetIds:
-          - !Ref EfsLambdaSubnetA
-          - !Ref EfsLambdaSubnetB
+        SubnetIds: !Ref SubnetIds
       FileSystemConfigs:
           - Arn: !GetAtt AccessPoint.Arn
             LocalMountPath: /mnt/lambda

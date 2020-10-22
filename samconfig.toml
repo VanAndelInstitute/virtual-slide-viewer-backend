@@ -8,7 +8,7 @@ s3_prefix = "vsv-backend-dev"
 region = "us-east-2"
 confirm_changeset = false
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "EnvType=\"dev\" StageName=\"dev\" AllowOrigin=\"http://localhost:8080\" ImagesPath=\"/mnt/lambda\""
+parameter_overrides = "VpcId=\"vpc-048ce5ae2f54da08c\" SubnetIds=\"subnet-08ecf506e5200f694,subnet-0326e02bf0573e3fd\" EnvType=\"dev\" StageName=\"dev\" AllowOrigin=\"http://localhost:8080\" ImagesPath=\"/mnt/lambda\""
 
 [dev]
 [dev.deploy]
