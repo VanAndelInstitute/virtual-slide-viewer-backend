@@ -6,7 +6,6 @@ from io import BytesIO
 import openslide
 from openslide import ImageSlide, open_slide
 from openslide.deepzoom import DeepZoomGenerator
-from PIL import Image
 import threading
 import xml.etree.ElementTree as xml
 
@@ -51,13 +50,6 @@ class CachedDeepZoomGenerator(DeepZoomGenerator):
                    tuple."""
         col, row = address
         file_path, cache_valid = check_cache(self.image_id, level, col, row, self.format)
-        if cache_valid:
-            # cache hit
-            with Image.open(file_path) as tile:
-                tile.load()
-            return tile
-    
-        # cache miss
         tile = DeepZoomGenerator.get_tile(self, level, address)
 
         # cache tile, but don't block before returning it
@@ -138,6 +130,8 @@ def check_cache(image_id, level, col, row, _format):
     return file_path, cache_valid
 
 def image_request_handler(event, context):
+    """ Handler for individual DeepZoom protocol requests.
+        Returns: one DeepZoom tile OR a DeepZoom info (dzi) xml document."""
     try:
         image_path = event['pathParameters']['imagePath']
         # 170782.dzi
@@ -191,15 +185,17 @@ import json
 client = boto3.client('lambda')
 
 def generate_tiles_handler(image_id, level=None, address=None, tile_size=DEEPZOOM_TILE_SIZE_DEFAULT, overlap=DEEPZOOM_OVERLAP_DEFAULT, _format=DEEPZOOM_FORMAT_DEFAULT):
-    dz = load_slide(image_id)
-
+    """ Pre-compute tiles and cache them for an entire SVS image, using lots of parallel Lambda invocations.
+        First code block is for individual invoke; second block is for massive parallelism."""
     if level and address:
         col, row = address
         # dz.get_tile() will load the image if it exists, so check here first to skip that
         file_path, cache_valid = check_cache(image_id, level, col, row, _format)
         if not cache_valid:
+            dz = load_slide(image_id)
             dz.get_tile(level, (col, row))
-    else:
+    else:        
+        dz = load_slide(image_id)
         dz.get_dzi(tile_size, overlap, _format)
         for level in range(dz.level_count):
             x_count, y_count = dz.level_tiles[level]
