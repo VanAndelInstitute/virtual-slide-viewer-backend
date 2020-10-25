@@ -8,15 +8,19 @@ from openslide import ImageSlide, open_slide
 from openslide.deepzoom import DeepZoomGenerator
 import threading
 import xml.etree.ElementTree as xml
+import logging
+logging.basicConfig(level=logging.INFO) 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 DEEPZOOM_FORMAT_DEFAULT = 'jpeg'
 DEEPZOOM_TILE_SIZE_DEFAULT = 254
 DEEPZOOM_OVERLAP_DEFAULT = 1
 DEEPZOOM_LIMIT_BOUNDS = False
 DEEPZOOM_TILE_QUALITY = 70
-ALLOW_ORIGIN = os.environ['ALLOW_ORIGIN']
-IMAGES_PATH = os.environ['IMAGES_PATH']
-ENV_TYPE = os.environ['ENV_TYPE']
+ALLOW_ORIGIN = os.environ.get('ALLOW_ORIGIN')
+IMAGES_PATH = os.environ.get('IMAGES_PATH', '/tmp')
+ENV_TYPE = os.environ.get('ENV_TYPE', 'dev')
 
 
 def cache_tile(tile, outfile, _format):
@@ -25,6 +29,7 @@ def cache_tile(tile, outfile, _format):
     filepath = os.path.join(tiledir, filename)
     os.makedirs(tiledir, exist_ok=True)
     tile.save(filepath, _format, quality=DEEPZOOM_TILE_QUALITY)
+    logger.info(f'Cached tile: {outfile}')
 
 class CachedDeepZoomGenerator(DeepZoomGenerator):
     def __init__(self, image_id, tile_size, overlap, _format):
@@ -52,8 +57,9 @@ class CachedDeepZoomGenerator(DeepZoomGenerator):
         file_path, cache_valid = check_cache(self.image_id, level, col, row, self.format)
         tile = DeepZoomGenerator.get_tile(self, level, address)
 
-        # cache tile, but don't block before returning it
-        threading.Thread(target=cache_tile, args=(tile, file_path, self.format)).start()
+        if not cache_valid:
+            # cache tile, but don't block before returning it
+            threading.Thread(target=cache_tile, args=(tile, file_path, self.format)).start()
         
         return tile
     
@@ -97,7 +103,10 @@ def respond(success, error=None, status=200, content_type=None):
         response['headers']['Content-Type'] = content_type
         if content_type.startswith('image'):
             response['isBase64Encoded'] = True
-    print(response)
+
+    log_msg = {x: response[x] if not type(response[x]) is bytes else response[x].decode('ascii') for x in response}
+    logger.debug(json.dumps(log_msg))
+
     return response
 
 open_slides = {}
@@ -134,6 +143,7 @@ def image_request_handler(event, context):
         Returns: one DeepZoom tile OR a DeepZoom info (dzi) xml document."""
     try:
         image_path = event['pathParameters']['imagePath']
+        logger.info(image_path)
         # 170782.dzi
         # 170782_files/14/15_16.jpeg
         request = re.match(r'(?P<image_id>\w+)((?P<dzi>\.dzi)|_files/(?P<level>\d{1,2})/(?P<col>\d{1,3})_(?P<row>\d{1,3})\.(?P<format>jpeg|png))', image_path)
@@ -165,6 +175,7 @@ def image_request_handler(event, context):
         _format = request.group('format')
         file_path, cache_valid = check_cache(image_id, level, col, row, _format)
         if cache_valid:
+            logger.info('From cache')
             # cache hit
             with open(file_path, 'rb') as f:
                 result = f.read()
@@ -174,6 +185,7 @@ def image_request_handler(event, context):
             tile = dz.get_tile(level, (col, row))
             buf = BytesIO()
             tile.save(buf, _format, quality=DEEPZOOM_TILE_QUALITY)
+            tile.close()
             result = buf.getvalue()
         return respond(base64.b64encode(result), content_type=f'image/{_format}')
         
@@ -208,3 +220,8 @@ def generate_tiles_handler(image_id, level=None, address=None, tile_size=DEEPZOO
                     Payload=json.dumps(request),
                     Qualifier=ENV_TYPE
                 )
+
+import sys
+import json
+if __name__ == '__main__':
+    image_request_handler(json.loads(sys.argv[1]), None)

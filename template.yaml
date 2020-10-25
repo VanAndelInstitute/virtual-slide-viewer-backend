@@ -61,10 +61,6 @@ Resources:
         IpProtocol: tcp
   EfsFileSystem:
     Type: AWS::EFS::FileSystem
-    Properties:
-      Tags: 
-        - Key: 'Name'
-          Value: 'VirtualSlideViewer'
   MountTargetA:
     Type: AWS::EFS::MountTarget
     Properties:
@@ -161,7 +157,7 @@ Resources:
       CodeUri: DeepZoom
       Handler: app.image_request_handler
       Runtime: python3.8
-      Timeout: 15
+      Timeout: 30
       MemorySize: 512
       Layers:
         - !Ref OpenSlide
