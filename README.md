@@ -11,24 +11,20 @@ The infrastructure code is currently a SAM template.
 
 
 ## General workflow for Virtual Slide Viewer deployments
-1. Scanner dumps files onto ScanScope Workstation into a locally-mounted EFS share
-2.	**Scanner technician reviews images for scanning errors**
+1. Aperio scanner dumps SVS images onto local ScanScope workstation storage
+1. AWS DataSync agent transfers SVS files to Amazon EFS
+1. Amazon EventBridge rule forwards file transfer event to AWS Lambda
+1. AWS Lambda:
+    - extracts label and thumbnail images from SVS file
+    - extracts image metadata from TIFF tags and reads barcode from label image
+    - uploads metadata to Amazon DynamoDB table
+    - extracts DeepZoom tiles from SVS file and stores them as JPEGs in EFS
+5.	**Scanner technician reviews images for scanning errors**
     - searches for new (unsent) slides
     - deletes and rescans failed slide scans
     - fixes slide/case IDs, if incorrect or missing
     - marks slides to send (metadata) to CDR
-3.	**Pathologist reviews slides**
+6.	**Pathologist reviews slides**
 
 ## Related projects
 - [Virtual Slide Viewer frontend](https://github.com/VanAndelInstitute/virtual-slide-viewer)
-
-## Performance testing
-| Configuration                               | Python 3.8 | Pillow-SIMD | OpenSlide | Lambda | EFS | Rank (1=fastest) | 
-|---------------------------------------------|------------|-------------|-----------|--------|-----|------------------|
-| Lambda+Python+SVS images on EFS             | x          | x           | x         | x      | x   | 10               | 
-| Lambda+Python+S3 DeepZoom pyramid files     | x          |             |           | x      |     | 2                | 
-| Lambda+Python+DeepZoom pyramid files on EFS | x          |             |           | x      | x   | 1                | 
-| EC2+Python+SVS images on EFS                | x          | x           | x         |        | x   | 10               | 
-| EC2+Python+DeepZoom pyramid files on EFS    | x          |             |           |        | x   | 1.5              | 
-| EC2+Python+SVS images on EBS                | x          | x           | x         |        |     | 10               | 
-| EC2+IIPServer+SVS images on EFS             |            |             | x         |        | x   | 5                | 
