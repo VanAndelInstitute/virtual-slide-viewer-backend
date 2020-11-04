@@ -12,6 +12,18 @@ Parameters:
   SubnetIds:
     Type: CommaDelimitedList
     Description: 'The list of Subnet IDs, for at least two Availability Zones in the region in your Virtual Private Cloud (VPC)'
+  FileSystemId:
+    Type: String
+    Description: File system id of EfsFileSystem
+  SecurityGroupId:
+    Type: String
+    Description: Security group id of EfsLambdaSecurityGroup
+  AccessPointId:
+    Type: String
+    Description: ID of AccessPoint
+  AccessPointArn:
+    Type: String
+    Description: ARN of AccessPoint
   EnvType:
     Description: Runtime environment type.
     Default: dev
@@ -29,6 +41,9 @@ Parameters:
     Description: File system path to image files.
     Default: '/mnt/lambda'
     Type: String
+  TableName:
+    Description: Slide table for image metadata.
+    Type: String
 
 Conditions:
   UseStageName: !Not [!Equals [!Ref StageName, '']]
@@ -39,53 +54,10 @@ Globals:
   Function:
     Environment:
       Variables:
-        ALLOW_ORIGIN: !Ref AllowOrigin
         IMAGES_PATH: !Ref ImagesPath
         ENV_TYPE: !Ref EnvType
 
 Resources:
-  EfsLambdaSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: EFS + Lambda on SAM Security Group
-      VpcId: !Ref VpcId
-      SecurityGroupEgress:
-      - CidrIp: '0.0.0.0/0'
-        FromPort: 0
-        ToPort: 65535
-        IpProtocol: tcp
-      SecurityGroupIngress:
-      - CidrIp: '0.0.0.0/0'
-        FromPort: 0
-        ToPort: 65535
-        IpProtocol: tcp
-  EfsFileSystem:
-    Type: AWS::EFS::FileSystem
-  MountTargetA:
-    Type: AWS::EFS::MountTarget
-    Properties:
-      FileSystemId: !Ref EfsFileSystem
-      SubnetId: !Select [ 0, !Ref SubnetIds ]
-      SecurityGroups: [!Ref EfsLambdaSecurityGroup]
-  MountTargetB:
-    Type: AWS::EFS::MountTarget
-    Properties:
-      FileSystemId: !Ref EfsFileSystem
-      SubnetId: !Select [ 1, !Ref SubnetIds ]
-      SecurityGroups: [!Ref EfsLambdaSecurityGroup]
-  AccessPoint:
-    Type: AWS::EFS::AccessPoint
-    Properties:
-      FileSystemId: !Ref EfsFileSystem
-      PosixUser:
-        Gid: '1000'
-        Uid: '1000'
-      RootDirectory:
-        Path: /lambda
-        CreationInfo:
-          OwnerGid: '1000'
-          OwnerUid: '1000'
-          Permissions: '755'
   S3Endpoint:
     Type: 'AWS::EC2::VPCEndpoint'
     Properties:
@@ -115,31 +87,29 @@ Resources:
       VpcId: !Ref VpcId
       ServiceName: !Sub com.amazonaws.${AWS::Region}.logs
       SecurityGroupIds:
-        - !Ref EfsLambdaSecurityGroup
+        - !Ref SecurityGroupId
       SubnetIds: !Ref SubnetIds
   TransferImageFunction:
     Type: AWS::Serverless::Function
-    DependsOn:
-      - MountTargetA
-      - MountTargetB
     Properties:
       CodeUri: transfer_image
       Handler: app.transfer_s3_objects
       Runtime: python3.8
       Timeout: 900
       MemorySize: 3008
+      AutoPublishAlias: !Ref EnvType
       Policies:
         - EFSWriteAccessPolicy:
-            FileSystem: !Ref EfsFileSystem
-            AccessPoint: !Ref AccessPoint
+            FileSystem: !Ref FileSystemId
+            AccessPoint: !Ref AccessPointId
         - S3ReadPolicy:
             BucketName: '*'
       VpcConfig:
         SecurityGroupIds:
-          - Ref: EfsLambdaSecurityGroup
+          - Ref: SecurityGroupId
         SubnetIds: !Ref SubnetIds
       FileSystemConfigs:
-        - Arn: !GetAtt AccessPoint.Arn
+        - Arn: !Ref AccessPointArn
           LocalMountPath: /mnt/lambda
       Events:
         ImagesApi:
@@ -150,30 +120,30 @@ Resources:
             Method: POST
   ImageRequestFunction:
     Type: AWS::Serverless::Function
-    DependsOn:
-      - MountTargetA
-      - MountTargetB
     Properties:
-      CodeUri: DeepZoom
-      Handler: app.image_request_handler
+      CodeUri: vsv
+      Handler: imagerequest.lambda_handler
       Runtime: python3.8
       Timeout: 30
-      MemorySize: 512
+      MemorySize: 768
+      Environment:
+        Variables:
+          ALLOW_ORIGIN: !Ref AllowOrigin
+      AutoPublishAlias: !Ref EnvType
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
-        - !Sub "arn:aws:lambda:${AWS::Region}:580247275435:layer:LambdaInsightsExtension:2"
       Policies:
         - EFSWriteAccessPolicy:
-            FileSystem: !Ref EfsFileSystem
-            AccessPoint: !Ref AccessPoint
+            FileSystem: !Ref FileSystemId
+            AccessPoint: !Ref AccessPointId
         - CloudWatchLambdaInsightsExecutionRolePolicy
       VpcConfig:
         SecurityGroupIds:
-          - Ref: EfsLambdaSecurityGroup
+          - Ref: SecurityGroupId
         SubnetIds: !Ref SubnetIds
       FileSystemConfigs:
-          - Arn: !GetAtt AccessPoint.Arn
+          - Arn: !Ref AccessPointArn
             LocalMountPath: /mnt/lambda
       Events:
         ImagesApi:
@@ -182,40 +152,66 @@ Resources:
             RestApiId: !Ref ImagesApi
             Path: /DeepZoom/{imagePath+}
             Method: GET
-  GenerateTilesFunction:
+  GenerateTileFunction:
     Type: AWS::Serverless::Function
-    DependsOn:
-      - MountTargetA
-      - MountTargetB
     Properties:
-      CodeUri: DeepZoom
-      Handler: app.generate_tiles_handler
+      CodeUri: vsv
+      Handler: generatetile.lambda_handler
       Runtime: python3.8
-      Timeout: 60
-      MemorySize: 128
+      Timeout: 300
+      MemorySize: 1536
+      AutoPublishAlias: !Ref EnvType
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
-        - !Sub "arn:aws:lambda:${AWS::Region}:580247275435:layer:LambdaInsightsExtension:2"
       Policies:
         - EFSWriteAccessPolicy:
-            FileSystem: !Ref EfsFileSystem
-            AccessPoint: !Ref AccessPoint
+            FileSystem: !Ref FileSystemId
+            AccessPoint: !Ref AccessPointId
         - CloudWatchLambdaInsightsExecutionRolePolicy
       VpcConfig:
         SecurityGroupIds:
-          - Ref: EfsLambdaSecurityGroup
+          - Ref: SecurityGroupId
         SubnetIds: !Ref SubnetIds
       FileSystemConfigs:
-          - Arn: !GetAtt AccessPoint.Arn
+          - Arn: !Ref AccessPointArn
+            LocalMountPath: /mnt/lambda
+  DataSyncEventFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: vsv
+      Handler: datasyncevent.lambda_handler
+      Runtime: python3.8
+      Timeout: 300
+      MemorySize: 1024
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+          TILES_FUNCTION_NAME: !Ref GenerateTileFunction
+      AutoPublishAlias: !Ref EnvType
+      Layers:
+        - !Ref OpenSlide
+        - !Ref PillowSIMD
+        - !Ref libdmtx
+      Policies:
+        - EFSWriteAccessPolicy:
+            FileSystem: !Ref FileSystemId
+            AccessPoint: !Ref AccessPointId
+        - CloudWatchLambdaInsightsExecutionRolePolicy
+      VpcConfig:
+        SecurityGroupIds:
+          - Ref: SecurityGroupId
+        SubnetIds: !Ref SubnetIds
+      FileSystemConfigs:
+          - Arn: !Ref AccessPointArn
             LocalMountPath: /mnt/lambda
       Events:
-        ImagesApi:
-          Type: Api
+        DataSyncLogs:
+          Type: CloudWatchLogs
           Properties:
-            RestApiId: !Ref ImagesApi
-            Path: /svs2vsv/{image_id}
-            Method: GET
+            LogGroupName: /aws/datasync
+            FilterPattern: 'NOTICE Verified file'
+      
   OpenSlide:
     Type: AWS::Serverless::LayerVersion
     Properties:
@@ -232,6 +228,14 @@ Resources:
         - python3.8
     Metadata:
       BuildMethod: makefile
+  libdmtx:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: libdmtx
+      CompatibleRuntimes:
+        - python3.8
+    Metadata:
+      BuildMethod: makefile
   ImagesApi:
     Type: AWS::Serverless::Api
     Properties:
@@ -239,7 +243,7 @@ Resources:
       BinaryMediaTypes: ['*/*']
       EndpointConfiguration:
         Type: REGIONAL
-      
+
 Outputs:
   ApiUrl:
     Description: URL of your API endpoint
