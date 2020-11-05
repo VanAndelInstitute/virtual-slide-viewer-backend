@@ -5,9 +5,12 @@ for DeepZoom tiles by using [OpenSeadragon](https://openseadragon.github.io/) to
 ## Build and deploy
 The infrastructure code is currently a SAM template.
 
-`$ sam build -u`
-
-`$ sam deploy`
+````
+$ sam build -t efs.yaml
+$ sam deploy --config-file efs.toml
+$ sam build -u -t vsv.yaml
+$ sam deploy --config-file vsv.toml
+```
 
 
 ## General workflow for Virtual Slide Viewer deployments

@@ -79,16 +79,6 @@ Resources:
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
       VpcEndpointType: Gateway
       VpcId: !Ref VpcId
-  CloudWatchLogsVpcPrivateEndpoint:
-    Type: AWS::EC2::VPCEndpoint
-    Properties:
-      PrivateDnsEnabled: 'true'
-      VpcEndpointType: Interface
-      VpcId: !Ref VpcId
-      ServiceName: !Sub com.amazonaws.${AWS::Region}.logs
-      SecurityGroupIds:
-        - !Ref SecurityGroupId
-      SubnetIds: !Ref SubnetIds
   TransferImageFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -211,7 +201,6 @@ Resources:
           Properties:
             LogGroupName: /aws/datasync
             FilterPattern: 'NOTICE Verified file'
-      
   OpenSlide:
     Type: AWS::Serverless::LayerVersion
     Properties:
