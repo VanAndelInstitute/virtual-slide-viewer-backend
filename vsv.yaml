@@ -12,6 +12,9 @@ Parameters:
   SubnetIds:
     Type: CommaDelimitedList
     Description: 'The list of Subnet IDs, for at least two Availability Zones in the region in your Virtual Private Cloud (VPC)'
+  RouteTableIds:
+    Type: CommaDelimitedList
+    Description: 'Route tables to add VPC endpoint configs'
   FileSystemId:
     Type: String
     Description: File system id of EfsFileSystem
@@ -58,7 +61,7 @@ Globals:
         ENV_TYPE: !Ref EnvType
 
 Resources:
-  S3Endpoint:
+  DynamoDbEndpoint:
     Type: 'AWS::EC2::VPCEndpoint'
     Properties:
       PolicyDocument:
@@ -66,18 +69,13 @@ Resources:
         Statement:
           - Effect: Allow
             Principal: '*'
-            Action:
-              - 's3:GetObject'
-              - 's3:HeadObject'
-              - 's3:ListBucket'
-              - 's3:GetBucketLocation'
-              - 's3:GetObjectVersion'
-              - 's3:GetLifecycleConfiguration'
+            Action: 'dybamodb:PutItem'
             Resource:
-              - !Sub 'arn:aws:s3:::*'
-              - !Sub 'arn:aws:s3:::*/*'
-      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}'
+              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}/indexes/*'
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
       VpcEndpointType: Gateway
+      RouteTableIds: !Ref RouteTableIds
       VpcId: !Ref VpcId
   TransferImageFunction:
     Type: AWS::Serverless::Function
@@ -87,6 +85,7 @@ Resources:
       Runtime: python3.8
       Timeout: 900
       MemorySize: 3008
+      FunctionName: !Sub ${AWS::StackName}-TransferImageFunction
       AutoPublishAlias: !Ref EnvType
       Policies:
         - EFSWriteAccessPolicy:
@@ -116,6 +115,7 @@ Resources:
       Runtime: python3.8
       Timeout: 30
       MemorySize: 768
+      FunctionName: !Sub ${AWS::StackName}-ImageRequestFunction
       Environment:
         Variables:
           ALLOW_ORIGIN: !Ref AllowOrigin
@@ -150,6 +150,10 @@ Resources:
       Runtime: python3.8
       Timeout: 300
       MemorySize: 1536
+      FunctionName: !Sub ${AWS::StackName}-GenerateTileFunction
+      Environment:
+        Variables:
+          TILES_FUNCTION_NAME: !Sub ${AWS::StackName}-GenerateTileFunction
       AutoPublishAlias: !Ref EnvType
       Layers:
         - !Ref OpenSlide
@@ -174,10 +178,11 @@ Resources:
       Runtime: python3.8
       Timeout: 300
       MemorySize: 1024
+      FunctionName: !Sub ${AWS::StackName}-DataSyncEventFunction
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
-          TILES_FUNCTION_NAME: !Ref GenerateTileFunction
+          TILES_FUNCTION_NAME: !Sub ${AWS::StackName}-GenerateTileFunction
       AutoPublishAlias: !Ref EnvType
       Layers:
         - !Ref OpenSlide
@@ -187,7 +192,8 @@ Resources:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref FileSystemId
             AccessPoint: !Ref AccessPointId
-        - CloudWatchLambdaInsightsExecutionRolePolicy
+        - DynamoDBWritePolicy:
+            TableName: !Ref TableName
       VpcConfig:
         SecurityGroupIds:
           - Ref: SecurityGroupId

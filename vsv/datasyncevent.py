@@ -5,7 +5,6 @@ import json
 import re
 import openslide
 from slidecache import load_slide, DEEPZOOM_FORMAT_DEFAULT
-import boto3
 from pylibdmtx import pylibdmtx
 from datetime import datetime
 import logging
@@ -35,8 +34,7 @@ def lambda_handler(event, context):
     loggroup = payload['logGroup']
     logstream = payload['logStream']
     for log_event in log_events:
-        logger.debug(log_event)
-        match = re.match(r'[NOTICE] Verified file /(?P<filename>\d+\.svs), \d+ bytes', log_event)
+        match = re.match(r'\[NOTICE\] Verified file /(?P<filename>\w+\.svs), \d+ bytes', log_event['message'])
         preprocess_image(match.group('filename'))
 
 def preprocess_image(image_filename):
@@ -51,9 +49,12 @@ def preprocess_image(image_filename):
     label = osr.associated_images.get(u'label')
     label.convert('RGB').save(os.path.join(IMAGES_PATH, f'{image_id}_label.jpg'))
 
-    # decode slide id from 2D barcode in label image
-    slide_id = pylibdmtx.decode(label)[0].data.decode('ascii')
-    print(slide_id)
+    # decode slide id from 2D Data Matrix barcode in label image
+    label_data = pylibdmtx.decode(label)
+    if len(label_data) != 1:
+        logger.error('Bad label data')
+        return
+    slide_id = label_data[0].data.decode('ascii')
     # guess at case id
     last_index = slide_id.rfind('-')
     case_id = slide_id[0:last_index]
