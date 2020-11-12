@@ -179,7 +179,7 @@ Resources:
             FileSystem: !Ref FileSystemId
             AccessPoint: !Ref AccessPointId
         - LambdaInvokePolicy:
-            FunctionName: !Sub ${AWS::StackName}-GenerateTilesFunction
+          FunctionName: !Sub ${AWS::StackName}-GenerateTilesFunction
       VpcConfig:
         SecurityGroupIds:
           - Ref: SecurityGroupId
@@ -212,7 +212,7 @@ Resources:
         - DynamoDBWritePolicy:
             TableName: !Ref TableName
         - LambdaInvokePolicy:
-            FunctionName: !Sub ${AWS::StackName}-GenerateTilesFunction
+          FunctionName: !Sub ${AWS::StackName}-GenerateTilesFunction
       VpcConfig:
         SecurityGroupIds:
           - Ref: SecurityGroupId
