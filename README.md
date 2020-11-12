@@ -3,9 +3,9 @@ The VSV backend is implemented as an AWS Serverless application. It mounts an EF
 for DeepZoom tiles by using [OpenSeadragon](https://openseadragon.github.io/) to fetch TIFF tiles and [Pillow-SIMD](https://github.com/uploadcare/pillow-simd) to shrink tiles as needed.
 
 ## Build and deploy
-The infrastructure code is currently a SAM template.
+The infrastructure code is currently a [SAM template](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-getting-started.html).
 
-````
+```
 $ sam build -t efs.yaml
 $ sam deploy --config-file efs.toml
 $ sam build -u -t vsv.yaml
