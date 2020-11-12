@@ -4,7 +4,8 @@ import gzip
 import json
 import re
 import openslide
-from slidecache import load_slide, DEEPZOOM_FORMAT_DEFAULT
+from slidecache import load_slide
+import boto3
 from pylibdmtx import pylibdmtx
 from datetime import datetime
 import logging
@@ -85,15 +86,13 @@ def preprocess_image(image_filename):
     # Pre-compute tiles and cache them for an entire SVS image, using lots of parallel Lambda invocations.
     dz = load_slide(image_id)
     lambda_client = boto3.client('lambda')
-    for level in range(dz.level_count):
-        x_count, y_count = dz.level_tiles[level]
-        for col, row in ((x, y) for x in range(x_count) for y in range(y_count)):
-            request = [ image_id, level, col, row, DEEPZOOM_FORMAT_DEFAULT ]
-            lambda_client.invoke(
-                FunctionName=TILES_FUNCTION_NAME,
-                InvocationType='Event',
-                LogType='None',
-                Payload=json.dumps(request),
-                Qualifier=ENV_TYPE
-            )
+    for level in dz.native_levels:
+        event = { 'image_id': image_id, 'level': level, 'level_tracts': dz.level_tracts[level] }
+        lambda_client.invoke(
+            FunctionName=TILES_FUNCTION_NAME,
+            InvocationType='Event',
+            LogType='None',
+            Payload=json.dumps(event),
+            Qualifier=ENV_TYPE
+        )
 

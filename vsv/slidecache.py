@@ -15,6 +15,8 @@ DEEPZOOM_TILE_QUALITY = 70
 IMAGES_PATH = os.environ.get('IMAGES_PATH', '/tmp')
 ENV_TYPE = os.environ.get('ENV_TYPE', 'dev')
 
+TRACT_LEN = 1
+PARCEL_LEN = 16
 
 class CachedDeepZoomGenerator(DeepZoomGenerator):
     def __init__(self, image_id, tile_size, overlap, _format):
@@ -31,6 +33,26 @@ class CachedDeepZoomGenerator(DeepZoomGenerator):
         if self.format != 'jpeg' and self.format != 'png':
             # Not supported by Deep Zoom
             raise ValueError(f'Unsupported format: {self.format}')
+
+        l0_l_downsamples = tuple(int(round(d)) for d in osr.level_downsamples)
+        # Total downsamples for each Deep Zoom level
+        l0_z_downsamples = tuple(2 ** (self.level_count - dz_level - 1)
+                    for dz_level in range(self.level_count))
+
+        native = lambda dz_level: l0_z_downsamples[dz_level] in l0_l_downsamples
+        self._dz_from_slide_level = tuple(filter(native, range(self.level_count)))
+
+    @property
+    def native_levels(self):
+        return self._dz_from_slide_level
+
+    @property
+    def level_tracts(self):
+        """ A list of (tracts_x, tracts_y) tuples for each Deep Zoom level. level_tracts[k] are the tile counts of level k.
+            Round up using ceiling (reverse floor) division: -(-n//d)
+        """
+        tiles_to_tracts = lambda tile_dims: (-(-tile_dims[0] // (TRACT_LEN*PARCEL_LEN)), -(-tile_dims[1] // (TRACT_LEN*PARCEL_LEN)))
+        return [*map(tiles_to_tracts, self.level_tiles)]
 
     def get_tile(self, level, address):
         """Return an RGB PIL.Image for a tile (not from cache), caching it first.
