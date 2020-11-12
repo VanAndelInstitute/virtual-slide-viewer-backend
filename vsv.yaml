@@ -77,6 +77,23 @@ Resources:
       VpcEndpointType: Gateway
       RouteTableIds: !Ref RouteTableIds
       VpcId: !Ref VpcId
+  LambdaEndpoint:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: 'lambda:InvokeFunction'
+            Resource:
+              - !Sub 'arn:aws:lambda:us-east-2:839559484193:function:${AWS::StackName}*'
+      PrivateDnsEnabled: True
+      SecurityGroupIds: !Ref SecurityGroupId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.lambda'
+      SubnetIds: !Ref SubnetIds
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
   TransferImageFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -127,7 +144,6 @@ Resources:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref FileSystemId
             AccessPoint: !Ref AccessPointId
-        - CloudWatchLambdaInsightsExecutionRolePolicy
       VpcConfig:
         SecurityGroupIds:
           - Ref: SecurityGroupId
@@ -162,7 +178,8 @@ Resources:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref FileSystemId
             AccessPoint: !Ref AccessPointId
-        - CloudWatchLambdaInsightsExecutionRolePolicy
+        - LambdaInvokePolicy:
+          FunctionName: !Sub ${AWS::StackName}-GenerateTilesFunction
       VpcConfig:
         SecurityGroupIds:
           - Ref: SecurityGroupId
@@ -194,6 +211,8 @@ Resources:
             AccessPoint: !Ref AccessPointId
         - DynamoDBWritePolicy:
             TableName: !Ref TableName
+        - LambdaInvokePolicy:
+          FunctionName: !Sub ${AWS::StackName}-GenerateTilesFunction
       VpcConfig:
         SecurityGroupIds:
           - Ref: SecurityGroupId
