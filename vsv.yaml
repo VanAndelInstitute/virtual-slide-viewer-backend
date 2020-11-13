@@ -116,7 +116,7 @@ Resources:
         SubnetIds: !Ref SubnetIds
       FileSystemConfigs:
         - Arn: !Ref AccessPointArn
-          LocalMountPath: /mnt/lambda
+          LocalMountPath: !Ref ImagesPath
       Events:
         ImagesApi:
           Type: Api
@@ -150,7 +150,7 @@ Resources:
         SubnetIds: !Ref SubnetIds
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
-            LocalMountPath: /mnt/lambda
+            LocalMountPath: !Ref ImagesPath
       Events:
         ImagesApi:
           Type: Api
@@ -186,7 +186,7 @@ Resources:
         SubnetIds: !Ref SubnetIds
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
-            LocalMountPath: /mnt/lambda
+            LocalMountPath: !Ref ImagesPath
   DataSyncEventFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -219,7 +219,7 @@ Resources:
         SubnetIds: !Ref SubnetIds
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
-            LocalMountPath: /mnt/lambda
+            LocalMountPath: !Ref ImagesPath
       Events:
         DataSyncLogs:
           Type: CloudWatchLogs

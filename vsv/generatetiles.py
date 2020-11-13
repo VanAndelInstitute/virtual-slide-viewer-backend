@@ -14,7 +14,9 @@ def lambda_handler(event, context):
     #    tiles. We compute multiple parcels in a single lambda invocation to minimize overhead and
     #    optimize cost. We compute a parcel at a time to maximize use of the OpenSlide tile cache.
     tract_x, tract_y = event.get('tract_x'), event.get('tract_y')
-    if tract_x:
+    has_column = tract_x is not None
+    has_row = tract_y is not None
+    if has_column:
         # 4. Given full coordinates for a tract, begin the process of generating tiles.
         image_id, level = event['image_id'], event['level']
         dz = load_slide(image_id)
@@ -42,13 +44,13 @@ def lambda_handler(event, context):
                 # 7. Now do the non-native levels below for this parcel, since a significant number of tiles will be
                 #    in the tile cache already.
                 level-=1
-                tile_addresses = filter(lambda x, y: x % 2 and y % 2) # reduce number of tiles to half plus remainder
-                tile_addresses = map(lambda x, y: (x // 2, y // 2)) # lower level addresses are half of upper level
+                tile_addresses = filter(lambda x, y: x % 2 and y % 2, tile_addresses) # reduce number of tiles to half plus remainder
+                tile_addresses = map(lambda x, y: (x // 2, y // 2), tile_addresses) # lower level addresses are half of upper level
                 is_next_native_level = level in dz.native_levels
 
-    elif tract_y:
+    elif has_row:
         # 3. Given a level and a row, invoke a lambda for each column of the given row in this level.
-        for tract_x in range(event['level_tracts'][0]):
+        for tract_x in range(event['num_tracts_x']):
             event['tract_x'] = tract_x
             lambda_client = boto3.client('lambda')
             lambda_client.invoke(
@@ -59,14 +61,18 @@ def lambda_handler(event, context):
                 Qualifier=ENV_TYPE
             )
     else:
-        # 2. Given only a level, invoke a lambda for each row of the level.
-        for tract_y in range(event['level_tracts'][1]):
-            event['tract_y'] = tract_y
-            lambda_client = boto3.client('lambda')
-            lambda_client.invoke(
-                FunctionName=TILES_FUNCTION_NAME,
-                InvocationType='Event',
-                LogType='None',
-                Payload=json.dumps(event),
-                Qualifier=ENV_TYPE
-            )
+        # 2. Given only an image ID, invoke a lambda for each row of each native level.
+        image_id = event['image_id']
+        dz = load_slide(image_id)
+        for level in dz.native_levels:
+            nx, ny = dz.level_tracts[level]
+            for tract_y in range(ny):
+                event = { 'image_id': image_id, 'level': level, 'tract_y': tract_y, 'num_tracts_x': nx }
+                lambda_client.invoke(
+                    FunctionName=TILES_FUNCTION_NAME,
+                    InvocationType='Event',
+                    LogType='None',
+                    Payload=json.dumps(event),
+                    Qualifier=ENV_TYPE
+                )
+    
