@@ -84,12 +84,15 @@ def lambda_handler(event, context):
                     # dz.get_tile() will load the image if it exists, so check here first to skip that
                     file_path, cache_valid = check_cache(image_id, level, tile['x'], tile['y'], DEEPZOOM_FORMAT_DEFAULT)
                     if not cache_valid:
-                        dz.get_tile(level, (tile['x'], tile['y']))
+                        try:
+                            dz.get_tile(level, (tile['x'], tile['y']))
+                        except:
+                            logger.info(((tile['x'], tile['y'])))
+                            raise
                 # 6. Now do the non-native levels below for this parcel, since a significant number of tiles will be
                 #    in the tile cache already.
                 level-=1
-                tile_addresses = filter(lambda t: t['x'] % 2 == 0 and t['y'] % 2 == 0, tile_addresses) # reduce number of tiles to half plus remainder
-                tile_addresses = [*map(lambda t: { 'x': t['x'] // 2, 'y': t['y'] // 2 }, tile_addresses)] # lower level addresses are half of upper level
+                tiles_addresses = [{'x': t['x'] // 2, 'y': t['y'] // 2} for t in tile_addresses if t['x'] % 2 == 0 and t['y'] % 2 == 0]
                 is_next_native_level = level in dz.native_levels
 
     else:
