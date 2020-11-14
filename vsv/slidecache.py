@@ -23,6 +23,7 @@ class CachedDeepZoomGenerator(DeepZoomGenerator):
         osr = openslide.open_slide(os.path.join(IMAGES_PATH, f'{image_id}.svs'))
         DeepZoomGenerator.__init__(self, osr, tile_size, overlap)
         
+        self.osr = osr
         self.image_id = image_id
         self.tile_size = tile_size
         self.overlap = overlap
@@ -76,6 +77,12 @@ class CachedDeepZoomGenerator(DeepZoomGenerator):
     def get_dzi(self):
         return DeepZoomGenerator.get_dzi(self, self.format)
 
+    def get_associated_image(self, name, _format):
+        image = self.osr.associated_images.get(name).convert('RGB')
+        imagedir = os.path.join(IMAGES_PATH, f'{self.image_id}_files/')
+        os.makedirs(imagedir, exist_ok=True)
+        image.save(os.path.join(imagedir, f'{name}.{_format}'))
+        return image
 
 open_slides = {}
 
