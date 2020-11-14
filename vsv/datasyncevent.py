@@ -86,7 +86,7 @@ def preprocess_image(image_filename):
     # Pre-compute tiles and cache them for an entire SVS image, using lots of parallel Lambda invocations.
     dz = load_slide(image_id)
     lambda_client = boto3.client('lambda')
-    event = { 'image_id': image_id }
+    event = { 'image_id': image_id, 'depth': 0 }
     lambda_client.invoke(
         FunctionName=TILES_FUNCTION_NAME,
         InvocationType='Event',
