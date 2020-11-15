@@ -1,0 +1,15 @@
+{
+  "version": "0",
+  "id": "d292320b-accc-4325-218c-f15c746f2098",
+  "detail-type": "DataSync Task Execution State Change",
+  "source": "aws.datasync",
+  "account": "839559484193",
+  "time": "2020-11-02T15:23:15Z",
+  "region": "us-east-2",
+  "resources": [
+      "arn:aws:datasync:us-east-2:839559484193:task/task-04a6a149a318fed5a/execution/exec-09ee8073add260441"
+  ],
+  "detail": {
+      "State": "SUCCESS"
+  }
+}

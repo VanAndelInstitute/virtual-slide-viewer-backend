@@ -187,15 +187,50 @@ Resources:
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
             LocalMountPath: !Ref ImagesPath
-  DataSyncEventFunction:
+  FindNewFilesFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: vsv
-      Handler: datasyncevent.lambda_handler
+      Handler: findnewfiles.lambda_handler
       Runtime: python3.8
-      Timeout: 300
-      MemorySize: 1024
-      FunctionName: !Sub ${AWS::StackName}-DataSyncEventFunction
+      Timeout: 30
+      MemorySize: 128
+      FunctionName: !Sub ${AWS::StackName}-FindNewFilesFunction
+      Environment:
+        Variables:
+          FILE_FUNCTION_NAME: !Sub ${AWS::StackName}-ProcessFileFunction
+      AutoPublishAlias: !Ref EnvType
+      Policies:
+        - EFSWriteAccessPolicy:
+            FileSystem: !Ref FileSystemId
+            AccessPoint: !Ref AccessPointId
+        - LambdaInvokePolicy:
+            FunctionName: !Sub ${AWS::StackName}-ProcessFileFunction
+      VpcConfig:
+        SecurityGroupIds:
+          - Ref: SecurityGroupId
+        SubnetIds: !Ref SubnetIds
+      FileSystemConfigs:
+          - Arn: !Ref AccessPointArn
+            LocalMountPath: !Ref ImagesPath
+      Events:
+        DataSyncSuccess:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source: [aws.datasync]
+              detail-type: [DataSync Task Execution State Change]
+              detail:
+                State: [SUCCESS]
+  ProcessFileFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: vsv
+      Handler: processfile.lambda_handler
+      Runtime: python3.8
+      Timeout: 480
+      MemorySize: 1536
+      FunctionName: !Sub ${AWS::StackName}-ProcessFileFunction
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
@@ -212,7 +247,7 @@ Resources:
         - DynamoDBWritePolicy:
             TableName: !Ref TableName
         - LambdaInvokePolicy:
-          FunctionName: !Sub ${AWS::StackName}-GenerateTilesFunction
+            FunctionName: !Sub ${AWS::StackName}-GenerateTilesFunction
       VpcConfig:
         SecurityGroupIds:
           - Ref: SecurityGroupId
@@ -220,12 +255,6 @@ Resources:
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
             LocalMountPath: !Ref ImagesPath
-      Events:
-        DataSyncLogs:
-          Type: CloudWatchLogs
-          Properties:
-            LogGroupName: /aws/datasync
-            FilterPattern: 'NOTICE Verified file'
   OpenSlide:
     Type: AWS::Serverless::LayerVersion
     Properties:

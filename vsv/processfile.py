@@ -1,8 +1,5 @@
 import os
-import base64
-import gzip
 import json
-import re
 import openslide
 from slidecache import load_slide
 import boto3
@@ -21,34 +18,25 @@ PROPERTY_NAME_APERIO_MPP = u'aperio.MPP'
 PROPERTY_NAME_APERIO_APPMAG = u'aperio.AppMag'
 
 IMAGES_PATH = os.environ.get('IMAGES_PATH', '/tmp')
-ENV_TYPE = os.environ.get('ENV_TYPE', 'dev')
 TABLE_NAME = os.environ.get('TABLE_NAME')
 TILES_FUNCTION_NAME = os.environ.get('TILES_FUNCTION_NAME')
+ENV_TYPE = os.environ.get('ENV_TYPE', 'dev')
 
 
 def lambda_handler(event, context):
-    compressed_payload = base64.b64decode(event['awslogs']['data'])
-    uncompressed_payload = gzip.decompress(compressed_payload)
-    payload = json.loads(uncompressed_payload)
-    log_events = payload['logEvents']
-    logger.debug(payload)
-    loggroup = payload['logGroup']
-    logstream = payload['logStream']
-    for log_event in log_events:
-        match = re.match(r'\[NOTICE\] Verified file /(?P<filename>\w+\.svs), \d+ bytes', log_event['message'])
-        preprocess_image(match.group('filename'))
-
-def preprocess_image(image_filename):
+    image_filename = event['filename']
     osr = openslide.open_slide(os.path.join(IMAGES_PATH, image_filename))
     
     # get image id from tiff tags; create output folder
     image_id = osr.properties.get(PROPERTY_NAME_APERIO_IMAGEID)
     
     # Extract label and thumbnail images
-    thumbnail = osr.associated_images.get(u'thumbnail')
-    thumbnail.convert('RGB').save(os.path.join(IMAGES_PATH, f'{image_id}_thumbnail.jpg'))
-    label = osr.associated_images.get(u'label')
-    label.convert('RGB').save(os.path.join(IMAGES_PATH, f'{image_id}_label.jpg'))
+    imagedir = os.path.join(IMAGES_PATH, f'{image_id}_files/')
+    os.makedirs(imagedir, exist_ok=True)
+    thumbnail = osr.associated_images.get(u'thumbnail').convert('RGB')
+    thumbnail.save(os.path.join(IMAGES_PATH, f'{image_id}_files/thumbnail.jpg'))
+    label = osr.associated_images.get(u'label').convert('RGB')
+    label.save(os.path.join(IMAGES_PATH, f'{image_id}_files/label.jpg'))
 
     # decode slide id from 2D Data Matrix barcode in label image
     label_data = pylibdmtx.decode(label)
@@ -82,6 +70,7 @@ def preprocess_image(image_filename):
     dynamodb = boto3.resource('dynamodb')
     slide_table = dynamodb.Table(TABLE_NAME)
     slide_table.put_item(Item=metadata)
+    logger.info(f'Uploaded metadata for {image_filename}')
 
     # Pre-compute tiles and cache them for an entire SVS image, using lots of parallel Lambda invocations.
     dz = load_slide(image_id)
