@@ -92,7 +92,7 @@ def lambda_handler(event, context):
                 # 6. Now do the non-native levels below for this parcel, since a significant number of tiles will be
                 #    in the tile cache already.
                 level-=1
-                tiles_addresses = [{'x': t['x'] // 2, 'y': t['y'] // 2} for t in tile_addresses if t['x'] % 2 == 0 and t['y'] % 2 == 0]
+                tile_addresses = [{'x': t['x'] // 2, 'y': t['y'] // 2} for t in tile_addresses if t['x'] % 2 == 0 and t['y'] % 2 == 0]
                 is_next_native_level = level in dz.native_levels
 
     else:
