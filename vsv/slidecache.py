@@ -15,8 +15,7 @@ DEEPZOOM_LIMIT_BOUNDS = False
 DEEPZOOM_TILE_QUALITY = 70
 IMAGES_PATH = os.environ.get('IMAGES_PATH', '/tmp')
 ENV_TYPE = os.environ.get('ENV_TYPE', 'dev')
-X = 0
-Y = 1
+
 
 class CachedDeepZoomGenerator(DeepZoomGenerator):
     def __init__(self, image_id, tile_size, overlap, _format):
@@ -101,12 +100,13 @@ class CachedDeepZoomGenerator(DeepZoomGenerator):
 
     def get_region_parameters(self, dz_level, address, region_size):
         col, row = address
-        
+        x_size, y_size = region_size
+
         # Get preferred slide level
         slide_level = self.get_best_slide_level_for_dz_level(dz_level)
         l_downsample = round(self._osr.level_downsamples[slide_level])
         dz_downsample = int(2**(self.level_count-dz_level-1) / l_downsample)
-        l_lim = self._osr.level_dimensions[slide_level]
+        x_lim, y_lim = self._osr.level_dimensions[slide_level]
 
         # Calculate top/left and bottom/right overlap
         left_overlap = DEEPZOOM_OVERLAP_DEFAULT * int(col != 0)
@@ -118,8 +118,8 @@ class CachedDeepZoomGenerator(DeepZoomGenerator):
         # OpenSlide.read_region wants coordinates in level 0 reference frame.
         x0, y0 = l_downsample * xl, l_downsample * yl
         # OpenSlide.read_region wants dimensions in {slide_level} reference frame.
-        w = min(dz_downsample * region_size[X], l_lim[X] - xl)
-        h = min(dz_downsample * region_size[Y], l_lim[Y] - yl)
+        w = min(dz_downsample * x_size, x_lim - xl)
+        h = min(dz_downsample * y_size, y_lim - yl)
             
         # Return read_region() parameters plus tile size for final scaling
         return (x0,y0), slide_level, (w,h)
