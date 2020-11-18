@@ -1,6 +1,7 @@
 import os
 import openslide
 from openslide.deepzoom import DeepZoomGenerator
+from PIL import Image
 import xml.etree.ElementTree as xml
 import logging
 logging.basicConfig(level=logging.INFO) 
@@ -14,9 +15,8 @@ DEEPZOOM_LIMIT_BOUNDS = False
 DEEPZOOM_TILE_QUALITY = 70
 IMAGES_PATH = os.environ.get('IMAGES_PATH', '/tmp')
 ENV_TYPE = os.environ.get('ENV_TYPE', 'dev')
-
-TRACT_LEN = 1
-PARCEL_LEN = 16
+X = 0
+Y = 1
 
 class CachedDeepZoomGenerator(DeepZoomGenerator):
     def __init__(self, image_id, tile_size, overlap, _format):
@@ -35,26 +35,6 @@ class CachedDeepZoomGenerator(DeepZoomGenerator):
             # Not supported by Deep Zoom
             raise ValueError(f'Unsupported format: {self.format}')
 
-        l0_l_downsamples = tuple(int(round(d)) for d in osr.level_downsamples)
-        # Total downsamples for each Deep Zoom level
-        l0_z_downsamples = tuple(2 ** (self.level_count - dz_level - 1)
-                    for dz_level in range(self.level_count))
-
-        native = lambda dz_level: l0_z_downsamples[dz_level] in l0_l_downsamples
-        self._dz_from_slide_level = tuple(filter(native, range(self.level_count)))
-
-    @property
-    def native_levels(self):
-        return self._dz_from_slide_level
-
-    @property
-    def level_tracts(self):
-        """ A list of (tracts_x, tracts_y) tuples for each Deep Zoom level. level_tracts[k] are the tile counts of level k.
-            Round up using ceiling (reverse floor) division: -(-n//d)
-        """
-        tiles_to_tracts = lambda tile_dims: (-(-tile_dims[0] // (TRACT_LEN*PARCEL_LEN)), -(-tile_dims[1] // (TRACT_LEN*PARCEL_LEN)))
-        return [*map(tiles_to_tracts, self.level_tiles)]
-
     def get_tile(self, level, address):
         """Return an RGB PIL.Image for a tile (not from cache), caching it first.
 
@@ -63,8 +43,18 @@ class CachedDeepZoomGenerator(DeepZoomGenerator):
                    tuple."""
         col, row = address
         file_path, cache_valid = check_cache(self.image_id, level, col, row, self.format)
-        tile = DeepZoomGenerator.get_tile(self, level, address)
+        z_size = self.get_region_size(level, (col, row), (1,1))
+        args = self.get_region_parameters(level, (col, row), z_size)
+        tile = self._osr.read_region(*args)
 
+        # Apply on solid background
+        bg = Image.new('RGB', tile.size, self._bg_color)
+        tile = Image.composite(tile, bg, tile)
+
+        # Scale to the correct size
+        if tile.size != z_size:
+            tile.thumbnail(z_size, Image.ANTIALIAS)
+            
         if not cache_valid:
             # cache tile - EFS is async, so this shouldn't be a blocking call
             tiledir = os.path.dirname(file_path)
@@ -83,6 +73,57 @@ class CachedDeepZoomGenerator(DeepZoomGenerator):
         os.makedirs(imagedir, exist_ok=True)
         image.save(os.path.join(imagedir, f'{name}.{_format}'))
         return image
+
+    def get_region_size(self, dz_level, address, t_size):
+        col, row = address
+        num_cols, num_rows = t_size
+        col_lim, row_lim = self.level_tiles[dz_level]
+        if col < 0 or col+num_cols-1 >= col_lim or row < 0 or row+num_rows-1 >= row_lim:
+            raise ValueError("Invalid address")
+
+        # Calculate top/left and bottom/right overlap
+        left_overlap = DEEPZOOM_OVERLAP_DEFAULT * int(col != 0)
+        top_overlap = DEEPZOOM_OVERLAP_DEFAULT * int(row != 0)
+        right_overlap = DEEPZOOM_OVERLAP_DEFAULT * int(col + num_cols != col_lim)
+        bottom_overlap = DEEPZOOM_OVERLAP_DEFAULT * int(row + num_rows != row_lim)
+
+        # Get final size of the region
+        w_lim, h_lim = self.level_dimensions[dz_level]
+        w = num_cols * min(DEEPZOOM_TILE_SIZE_DEFAULT, w_lim - DEEPZOOM_TILE_SIZE_DEFAULT * col) + left_overlap + right_overlap
+        h = num_rows * min(DEEPZOOM_TILE_SIZE_DEFAULT, h_lim - DEEPZOOM_TILE_SIZE_DEFAULT * row) + top_overlap + bottom_overlap
+        return w, h
+
+    def get_best_slide_level_for_dz_level(self, dz_level):
+        downsample = 2**(self.level_count-dz_level-1)
+        for i in range(self._osr.level_count):
+            if round(downsample) < round(self._osr.level_downsamples[i]):
+                return 0 if i == 0 else i-1
+        return self._osr.level_count - 1
+
+    def get_region_parameters(self, dz_level, address, region_size):
+        col, row = address
+        
+        # Get preferred slide level
+        slide_level = self.get_best_slide_level_for_dz_level(dz_level)
+        l_downsample = round(self._osr.level_downsamples[slide_level])
+        dz_downsample = int(2**(self.level_count-dz_level-1) / l_downsample)
+        l_lim = self._osr.level_dimensions[slide_level]
+
+        # Calculate top/left and bottom/right overlap
+        left_overlap = DEEPZOOM_OVERLAP_DEFAULT * int(col != 0)
+        top_overlap = DEEPZOOM_OVERLAP_DEFAULT * int(row != 0)
+        
+        # Obtain the region coordinates in {slide_level} reference frame. Expand by top/left overlap if exists.
+        xl = dz_downsample * ((DEEPZOOM_TILE_SIZE_DEFAULT * col) - left_overlap)
+        yl = dz_downsample * ((DEEPZOOM_TILE_SIZE_DEFAULT * row) - top_overlap)
+        # OpenSlide.read_region wants coordinates in level 0 reference frame.
+        x0, y0 = l_downsample * xl, l_downsample * yl
+        # OpenSlide.read_region wants dimensions in {slide_level} reference frame.
+        w = min(dz_downsample * region_size[X], l_lim[X] - xl)
+        h = min(dz_downsample * region_size[Y], l_lim[Y] - yl)
+            
+        # Return read_region() parameters plus tile size for final scaling
+        return (x0,y0), slide_level, (w,h)
 
 open_slides = {}
 

@@ -1,3 +1,4 @@
 {
-    "python.pythonPath": "~/.pyenv/shims/python3"
+    "python.pythonPath": "~/.pyenv/shims/python3",
+    "python.autoComplete.extraPaths": ["./vsv"]
 }

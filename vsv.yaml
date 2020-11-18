@@ -94,44 +94,14 @@ Resources:
       SubnetIds: !Ref SubnetIds
       VpcEndpointType: Interface
       VpcId: !Ref VpcId
-  TransferImageFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: transfer_image
-      Handler: app.transfer_s3_objects
-      Runtime: python3.8
-      Timeout: 900
-      MemorySize: 3008
-      FunctionName: !Sub ${AWS::StackName}-TransferImageFunction
-      AutoPublishAlias: !Ref EnvType
-      Policies:
-        - EFSWriteAccessPolicy:
-            FileSystem: !Ref FileSystemId
-            AccessPoint: !Ref AccessPointId
-        - S3ReadPolicy:
-            BucketName: '*'
-      VpcConfig:
-        SecurityGroupIds:
-          - Ref: SecurityGroupId
-        SubnetIds: !Ref SubnetIds
-      FileSystemConfigs:
-        - Arn: !Ref AccessPointArn
-          LocalMountPath: !Ref ImagesPath
-      Events:
-        ImagesApi:
-          Type: Api
-          Properties:
-            RestApiId: !Ref ImagesApi
-            Path: /transfer_s3_objects/{bucket}/{prefix}
-            Method: POST
   ImageRequestFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: vsv
       Handler: imagerequest.lambda_handler
       Runtime: python3.8
-      Timeout: 30
-      MemorySize: 768
+      Timeout: 15
+      MemorySize: 640
       FunctionName: !Sub ${AWS::StackName}-ImageRequestFunction
       Environment:
         Variables:
@@ -164,13 +134,13 @@ Resources:
       CodeUri: vsv
       Handler: generatetile.lambda_handler
       Runtime: python3.8
-      Timeout: 300
-      MemorySize: 1536
+      Timeout: 480
+      MemorySize: 640
       FunctionName: !Sub ${AWS::StackName}-GenerateTilesFunction
-      Environment:
-        Variables:
-          TILES_FUNCTION_NAME: !Sub ${AWS::StackName}-GenerateTilesFunction
       AutoPublishAlias: !Ref EnvType
+      EventInvokeConfig:
+        MaximumEventAgeInSeconds: 120
+        MaximumRetryAttempts: 0
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
@@ -228,7 +198,7 @@ Resources:
       CodeUri: vsv
       Handler: processfile.lambda_handler
       Runtime: python3.8
-      Timeout: 480
+      Timeout: 450
       MemorySize: 1536
       FunctionName: !Sub ${AWS::StackName}-ProcessFileFunction
       Environment:

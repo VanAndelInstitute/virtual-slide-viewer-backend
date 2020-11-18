@@ -1,7 +1,6 @@
 import os
 import json
 import openslide
-from slidecache import load_slide
 import boto3
 from pylibdmtx import pylibdmtx
 from datetime import datetime
@@ -9,6 +8,7 @@ import logging
 logging.basicConfig(level=logging.INFO) 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+from helpers import load_slide, DEEPZOOM_FORMAT
 
 PROPERTY_NAME_APERIO_IMAGEID = u'aperio.ImageID'
 PROPERTY_NAME_APERIO_DATE = u'aperio.Date'
@@ -74,12 +74,27 @@ def lambda_handler(event, context):
 
     # Pre-compute tiles and cache them for an entire SVS image, using lots of parallel Lambda invocations.
     dz = load_slide(image_id)
+    dzi_path = os.path.join(IMAGES_PATH, f'{image_id}.dzi')
+    with open(dzi_path, 'wt', encoding='utf-8') as f:
+        f.write(dz.get_dzi(DEEPZOOM_FORMAT))
     lambda_client = boto3.client('lambda')
-    event = { 'image_id': image_id, 'depth': 0 }
-    lambda_client.invoke(
-        FunctionName=TILES_FUNCTION_NAME,
-        InvocationType='Event',
-        LogType='None',
-        Payload=json.dumps(event),
-        Qualifier=ENV_TYPE
-    )
+    for level in range(dz.level_count):
+        tiledir = os.path.join(IMAGES_PATH, f'{image_id}_files/{level}/')
+        os.makedirs(tiledir, exist_ok=True)
+
+    start_level = 0
+    for level in dz.native_levels:
+        X, Y = dz.level_tracts[level]
+        if start_level == 0:
+            X = Y = 1
+        for x in range(X):
+            for y in range(Y):
+                event = { 'image_id': image_id, 'levels': list(range(start_level, level+1)), 'tract': [x,y] }
+                lambda_client.invoke(
+                    FunctionName=TILES_FUNCTION_NAME,
+                    InvocationType='Event',
+                    LogType='None',
+                    Payload=json.dumps(event),
+                    Qualifier=ENV_TYPE
+                )
+        start_level = level+1
