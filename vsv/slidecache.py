@@ -47,9 +47,8 @@ class CachedDeepZoomGenerator(DeepZoomGenerator):
         args = self.get_region_parameters(level, (col, row), z_size)
         tile = self._osr.read_region(*args)
 
-        # Apply on solid background
-        bg = Image.new('RGB', tile.size, self._bg_color)
-        tile = Image.composite(tile, bg, tile)
+        # Premultiply alpha channel
+        tile = tile.convert('RGB')
 
         # Scale to the correct size
         if tile.size != z_size:
