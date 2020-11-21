@@ -1,0 +1,178 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'VPC resources for Virtual Slide Viewer'
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Region Config
+      Parameters:
+      - RegionAZ1Name
+      - RegionAZ2Name
+    - Label:
+        default: VPC Config
+      Parameters:
+      - CIDR
+      - SubnetACIDR
+      - SubnetBCIDR
+      - VPCName
+    ParameterLabels:
+      ProductionVPCName:
+        default: Name of VPC
+      ProductionCIDR:
+        default: VPC CIDR block
+      DMZSubnetACIDR:
+        default: CIDR block of A subnet
+      DMZSubnetBCIDR:
+        default: CIDR block of B subnet
+Parameters:
+  Environment:
+    Description: Runtime environment type.
+    Default: dev
+    Type: String
+    AllowedValues: [prod, dev, test]
+    ConstraintDescription: must specify prod, dev, or test.
+  RegionAZ1Name:
+    Description: Availability Zone 1 Name in Region
+    Type: String
+  RegionAZ2Name:
+    Description: Availability Zone 2 Name in Region
+    Type: String
+  VPCName:
+    Description: VPC Name
+    Type: String
+    Default: VSV
+  CIDR:
+    Description: CIDR block for  VPC
+    Type: String
+    Default: 10.100.0.0/16
+  SubnetACIDR:
+    Description: CIDR block for AZ-1b subnet
+    Type: String
+    Default: 10.100.10.0/24
+  SubnetBCIDR:
+    Description: CIDR block for AZ-1b subnet
+    Type: String
+    Default: 10.100.20.0/24
+  TableName:
+    Description: Slide table for image metadata.
+    Type: String
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref CIDR
+      InstanceTenancy: default
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+      - Key: Name
+        Value: !Ref VPCName
+      - Key: Environment
+        Value: !Ref Environment
+  RouteTableMain:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: !Ref VPCName
+  SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Ref SubnetACIDR
+      AvailabilityZone: !Ref RegionAZ1Name
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: Subnet A
+      - Key: Environment
+        Value: !Ref Environment
+  SubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Ref SubnetBCIDR
+      AvailabilityZone: !Ref RegionAZ2Name
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: Subnet B
+      - Key: Environment
+        Value: !Ref Environment
+  RouteAssocMainA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTableMain
+      SubnetId: !Ref SubnetA
+  RouteAssocMainB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTableMain
+      SubnetId: !Ref SubnetB
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: VSV Security Group
+      VpcId: !Ref VPC
+      SecurityGroupEgress:
+        - CidrIp: '0.0.0.0/0'
+          FromPort: 0
+          ToPort: 65535
+          IpProtocol: tcp
+      SecurityGroupIngress:
+        - CidrIp: '0.0.0.0/0'
+          FromPort: 0
+          ToPort: 65535
+          IpProtocol: tcp
+  DynamoDbEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: 'dybamodb:PutItem'
+            Resource:
+              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}'
+              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}/indexes/*'
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref RouteTableMain
+      VpcId: !Ref VPC
+  LambdaEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: 'lambda:InvokeFunction'
+            Resource:
+              - !Sub 'arn:aws:lambda:us-east-2:839559484193:function:${AWS::StackName}*'
+      PrivateDnsEnabled: True
+      SecurityGroupIds:
+        - !Ref SecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.lambda'
+      SubnetIds: 
+        - !Ref SubnetA
+        - !Ref SubnetB
+      VpcEndpointType: Interface
+      VpcId: !Ref VPC
+
+Outputs:
+  VpcId:
+    Description: 'The ID of the created Virtual Private Cloud (VPC)'
+    Value: !Ref VPC
+  SubnetIds:
+    Description: 'The list of created subnet IDs, for at least two Availability Zones in the region in your Virtual Private Cloud (VPC)'
+    Value: !Join [',', [!Ref SubnetA, !Ref SubnetB]]
+  RouteTableId:
+    Description: 'The ID of the created main route table of the VPC'
+    Value: !Ref RouteTableMain
+  SecurityGroupId:
+    Description: 'The ID of the created security group'
+    Value: !Ref SecurityGroup
+  

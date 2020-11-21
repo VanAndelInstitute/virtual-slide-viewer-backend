@@ -1,0 +1,152 @@
+AWSTemplateFormatVersion: 'z2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Example stack to that reuses the auth portion of the serverless application
+  in your own CloudFront distribution. 
+  After deployment, manually update the User Pool client to point the 'Callback URL' and 'Sign out URL' to the URL of the CloudFront distribution.
+  Alternately, add an alternate domain name to the CloudFront distribution and provide the name as parameter to the serverless stack. The alternate
+  domain will also require adding a certificate to the Cloudfront Distribution. This alternative will set the User Pool client to the right Callback URL
+  and Sign out URL automatically.
+  The sample CloudFront distribution illustrates a full pattern of use -- modify it as needed.
+  The HttpHeaders parameter and corresponding reference in the 'LambdaEdgeProtection' nested application Resource
+  illustrates how to pass information to the underlying SAM app
+  Outputs illustrate retrieving values from the underlying SAM application
+Parameters: 
+  BucketNameParameter: 
+    Type: String
+    Description: A legal bucket name.  Must not exist.
+  SemanticVersion:
+    Type: String
+    Description: Semantic version of the back end
+    Default: 2.0.3
+  ApiId:
+    Type: String
+    Description: The ID of the API Gateway deployment
+  HttpHeaders:
+    Type: String
+    Description: The HTTP headers to set on all responses from CloudFront. Defaults are illustrations only and contain a report-only Cloud Security Policy -- adjust for your application
+    Default: |-
+      {
+        "Content-Security-Policy-Report-Only": "default-src 'none'; img-src 'self' data: https://${ApiId}.execute-api.${AWS::Region}.${AWS::URLSuffix}; script-src 'self'; style-src 'self'; object-src 'none'; connect-src 'self' https://*.amazonaws.com https://*.amazoncognito.com",
+        "Strict-Transport-Security": "max-age=31536000; includeSubdomains; preload",
+        "Referrer-Policy": "same-origin",
+        "X-XSS-Protection": "1; mode=block",
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff"
+      }
+  AlternateDomainNames:
+    Type: String
+  UserPoolArn:
+    Type: String
+  UserPoolClientId:
+    Type: String
+  PriceClass:
+    Type: String
+    Description: CloudFront price class, e.g. PriceClass_200 for most regions (default), PriceClass_All for all regions (the default), PriceClass_100 least expensive (US, Canada, Europe), or PriceClass_All
+    Default: PriceClass_100
+Resources:
+  ApplicationBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: 
+        Ref: BucketNameParameter
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub '${BucketNameParameter}-OAI'
+  S3AccessPolicyForOAI:
+    Type: AWS::S3::BucketPolicy
+    Properties: 
+      Bucket:
+        Ref: ApplicationBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              CanonicalUser:
+                Fn::GetAtt: [ CloudFrontOriginAccessIdentity , S3CanonicalUserId ]
+            Action: "s3:GetObject"
+            Resource: !Sub "${ApplicationBucket.Arn}/*"
+  LambdaEdgeProtection:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location:
+        ApplicationId: arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge
+        SemanticVersion: !Ref SemanticVersion
+      Parameters:
+        HttpHeaders: !Sub HttpHeaders
+        AlternateDomainNames: AlternateDomainNames
+        UserPoolArn: !Ref UserPoolArn
+        UserPoolClientId: !Ref UserPoolClient
+        EnableSPAMode: false
+        CreateCloudFrontDistribution: false
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    DependsOn:
+      - LambdaEdgeProtection
+    Properties:
+      DistributionConfig:
+        # Aliases: <your alternate domain names, also pass these to the serverless stack below>
+        # ViewerCertificate: <the config for your HTTPS certificate>
+        CacheBehaviors:
+          - PathPattern: /parseauth
+            Compress: true
+            ForwardedValues:
+              QueryString: true
+            LambdaFunctionAssociations:
+              - EventType: viewer-request
+                LambdaFunctionARN: !GetAtt LambdaEdgeProtection.Outputs.ParseAuthHandler
+            TargetOriginId: dummy-origin
+            ViewerProtocolPolicy: redirect-to-https
+          - PathPattern: /refreshauth
+            Compress: true
+            ForwardedValues:
+              QueryString: true
+            LambdaFunctionAssociations:
+              - EventType: viewer-request
+                LambdaFunctionARN: !GetAtt LambdaEdgeProtection.Outputs.RefreshAuthHandler
+            TargetOriginId: dummy-origin
+            ViewerProtocolPolicy: redirect-to-https
+          - PathPattern: /signout
+            Compress: true
+            ForwardedValues:
+              QueryString: true
+            LambdaFunctionAssociations:
+              - EventType: viewer-request
+                LambdaFunctionARN: !GetAtt LambdaEdgeProtection.Outputs.SignOutHandler
+            TargetOriginId: dummy-origin
+            ViewerProtocolPolicy: redirect-to-https
+        DefaultCacheBehavior:
+          Compress: true
+          ForwardedValues:
+            QueryString: true
+          LambdaFunctionAssociations:
+            - EventType: viewer-request
+              LambdaFunctionARN: !GetAtt LambdaEdgeProtection.Outputs.CheckAuthHandler
+            - EventType: origin-response
+              LambdaFunctionARN: !GetAtt LambdaEdgeProtection.Outputs.HttpHeadersHandler
+          TargetOriginId: protected-origin
+          ViewerProtocolPolicy: redirect-to-https
+        Enabled: true
+        Origins:
+          - DomainName: will-never-be-reached.org # Dummy origin is used for Lambda@Edge functions, keep this as-is
+            Id: dummy-origin
+            CustomOriginConfig:
+              OriginProtocolPolicy: match-viewer
+          - DomainName: !Sub "${ApplicationBucket}.s3.amazonaws.com"
+            Id: protected-origin
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
+        CustomErrorResponses:
+            - ErrorCode: 404
+              ResponseCode: 200
+              ResponsePagePath: /index.html
+        PriceClass: !Ref PriceClass
+        DefaultRootObject: index.html
+Outputs:
+  WebsiteUrl:
+    Description: URL of the CloudFront distribution that serves your SPA from S3
+    Value: !GetAtt LambdaEdgeProtection.Outputs.WebsiteUrl

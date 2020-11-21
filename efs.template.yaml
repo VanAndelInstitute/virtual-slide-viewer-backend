@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'EFS resources for Virtual Slide Viewer'
+Parameters:
+  VPC:
+    Type: String
+    Description: 'ID of your existing Virtual Private Cloud (VPC)'
+  Subnets:
+    Type: CommaDelimitedList
+    Description: 'The list of Subnet IDs, for at least two Availability Zones in the region in your Virtual Private Cloud (VPC)'
+  SecurityGroup:
+    Type: String
+    Description: 'The ID of the security group to use'
+  Environment:
+    Description: Runtime environment type.
+    Default: dev
+    Type: String
+    AllowedValues: [prod, dev, test]
+    ConstraintDescription: must specify prod, dev, or test.
+
+Resources:
+  FileSystem:
+    Type: AWS::EFS::FileSystem
+    DeletionPolicy: Retain
+    Properties:
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub VSV-${Environment}
+  MountTargetA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId: !Select [ 0, !Ref Subnets ]
+      SecurityGroups: [!Ref SecurityGroup]
+  MountTargetB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId: !Select [ 1, !Ref Subnets ]
+      SecurityGroups: [!Ref SecurityGroup]
+  AccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Properties:
+      FileSystemId: !Ref FileSystem
+      PosixUser:
+        Gid: '1000'
+        Uid: '1000'
+      RootDirectory:
+        Path: /lambda
+        CreationInfo:
+          OwnerGid: '1000'
+          OwnerUid: '1000'
+          Permissions: '755'
+Outputs:
+  FileSystemId:
+    Description: 'The ID of the created file system'
+    Value: !Ref FileSystem
+  AccessPointId:
+    Description: 'The ID of the access point created for the file system'
+    Value: !Ref AccessPoint
+  AccessPointArn:
+    Description: 'The ARN of the access point created for the file system'
+    Value: !GetAtt AccessPoint.Arn

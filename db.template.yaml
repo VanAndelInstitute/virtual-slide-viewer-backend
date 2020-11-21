@@ -1,0 +1,280 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'DynamoDB Table resources for Virtual Slide Viewer'
+Parameters:
+  Environment:
+    Description: Runtime environment type.
+    Default: dev
+    Type: String
+    AllowedValues: [prod, dev, test]
+    ConstraintDescription: must specify prod, dev, or test.
+  GraphQLApiName:
+    Description: Name of GraphQL API for image metadata.
+    Type: String
+    Default: VsvSlideData-${Environment}
+  TableName:
+    Description: Name of slide table for image metadata.
+    Type: String
+    Default: VsvSlideTable
+Resources:
+  SlideTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${TableName}-${Environment}'
+      AttributeDefinitions: 
+        - AttributeName: ImageID
+          AttributeType: S
+        - AttributeName: CaseID
+          AttributeType: S
+        - AttributeName: Status
+          AttributeType: S
+        - AttributeName: SlideID
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      GlobalSecondaryIndexes: 
+        - IndexName: CaseID-index
+          KeySchema:
+            - AttributeName: CaseID
+              KeyType: HASH
+          Projection:
+            ProjectionType: KEYS_ONLY
+        - IndexName: Status-SlideID-index
+          KeySchema:
+            - AttributeName: Status
+              KeyType: HASH
+            - AttributeName: SlideID
+              KeyType: RANGE
+          Projection:
+            NonKeyAttributes:
+              - CaseID
+              - AppMag
+              - MPP
+              - ScanDate
+            ProjectionType: INCLUDE
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      KeySchema: 
+        - AttributeName: ImageID
+          KeyType: HASH
+
+  GraphQLApi:
+    Type: AWS::AppSync::GraphQLApi
+    Properties: 
+      Name: !Sub VsvSlideData-${Environment}
+      AuthenticationType: API_KEY
+  GraphQLApiKey:
+    Type: AWS::AppSync::ApiKey
+    DependsOn:
+      - GraphQLApi
+    Properties: 
+      ApiId: !GetAtt GraphQLApi.ApiId
+  GraphQLDataSourceRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      RoleName: !Sub appsync-ds-ddb-${TableName}
+      AssumeRolePolicyDocument: |-
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "appsync.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+      Description: Allows the AWS AppSync service to access your data source.
+      Path: '/service-role/'
+      Policies: 
+        - PolicyName: !Sub appsync-ds-ddb-${TableName}
+          PolicyDocument: !Sub |-
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Sid": "VisualEditor0",
+                        "Effect": "Allow",
+                        "Action": [
+                            "dynamodb:BatchGetItem",
+                            "dynamodb:BatchWriteItem",
+                            "dynamodb:PutItem",
+                            "dynamodb:DeleteItem",
+                            "dynamodb:GetItem",
+                            "dynamodb:Scan",
+                            "dynamodb:Query",
+                            "dynamodb:UpdateItem"
+                        ],
+                        "Resource": [
+                            "arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}",
+                            "arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}/*"
+                        ]
+                    }
+                ]
+            }
+  GraphQLDataSource:
+    Type: AWS::AppSync::DataSource
+    DependsOn:
+      - GraphQLDataSourceRole
+      - GraphQLApi
+    Properties: 
+      Name: !Join [ '_', !Split ['-', !Sub '${TableName}_${Environment}']]
+      Type: AMAZON_DYNAMODB
+      ApiId: !GetAtt GraphQLApi.ApiId
+      DynamoDBConfig: 
+        AwsRegion: !Sub ${AWS::Region}
+        TableName: !Ref SlideTable
+        UseCallerCredentials: false
+        Versioned: false
+      ServiceRoleArn: !GetAtt GraphQLDataSourceRole.Arn
+  GraphQLSchema:
+    Type: AWS::AppSync::GraphQLSchema
+    DependsOn:
+      - GraphQLApi
+    Properties: 
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Definition: |-
+          input CreateSlideInput {
+            CaseID: String
+            ImageID: String!
+            SlideID: String
+            ScanDate: AWSDateTime
+            AppMag: String
+            MPP: Float
+            height: Int
+            width: Int
+          }
+
+          input DeleteSlideInput {
+            ImageID: String!
+          }
+
+          type Mutation {
+            updateSlide(input: UpdateSlideInput!): Slide
+            deleteSlide(input: DeleteSlideInput!): Slide
+            deleteSlides(ImageIDs: [String!]): [Slide]
+          }
+
+          type Query {
+            getSlide(ImageID: String!): Slide
+            listSlides(filter: TableSlideFilterInput, limit: Int, nextToken: String): SlideConnection
+            listCaseIDs(nextToken: String): SlideConnection
+            querySlidesByStatus(Status: String!, limit: Int, nextToken: String): SlideConnection
+            getSlides(ImageIDs: [String!]): [Slide]
+          }
+
+          type Slide {
+            CaseID: String
+            ImageID: String!
+            SlideID: String
+            ScanDate: AWSDateTime
+            AppMag: String
+            MPP: Float
+            height: Int
+            width: Int
+            Status: String
+          }
+
+          type SlideConnection {
+            items: [Slide]
+            nextToken: String
+          }
+
+          type Subscription {
+            onUpdateSlide(
+              CaseID: String,
+              ImageID: String,
+              SlideID: String,
+              ScanDate: AWSDateTime
+            ): Slide
+              @aws_subscribe(mutations: ["updateSlide"])
+            onDeleteSlide(
+              CaseID: String,
+              ImageID: String,
+              SlideID: String,
+              ScanDate: AWSDateTime
+            ): Slide
+              @aws_subscribe(mutations: ["deleteSlide"])
+          }
+
+          input TableBooleanFilterInput {
+            ne: Boolean
+            eq: Boolean
+          }
+
+          input TableFloatFilterInput {
+            ne: Float
+            eq: Float
+            le: Float
+            lt: Float
+            ge: Float
+            gt: Float
+            contains: Float
+            notContains: Float
+            between: [Float]
+          }
+
+          input TableIDFilterInput {
+            ne: ID
+            eq: ID
+            le: ID
+            lt: ID
+            ge: ID
+            gt: ID
+            contains: ID
+            notContains: ID
+            between: [ID]
+            beginsWith: ID
+          }
+
+          input TableIntFilterInput {
+            ne: Int
+            eq: Int
+            le: Int
+            lt: Int
+            ge: Int
+            gt: Int
+            contains: Int
+            notContains: Int
+            between: [Int]
+          }
+
+          input TableSlideFilterInput {
+            CaseID: TableStringFilterInput
+            ImageID: TableStringFilterInput
+            SlideID: TableStringFilterInput
+            ScanDate: TableStringFilterInput
+            AppMag: TableStringFilterInput
+            MPP: TableFloatFilterInput
+          }
+
+          input TableStringFilterInput {
+            ne: String
+            eq: String
+            le: String
+            lt: String
+            ge: String
+            gt: String
+            contains: String
+            notContains: String
+            between: [String]
+            beginsWith: String
+          }
+
+          input UpdateSlideInput {
+            CaseID: String
+            ImageID: String!
+            SlideID: String
+            Status: String
+          }
+
+Outputs:
+  ApiId:
+    Description: ID of your GraphQL API
+    Value: !GetAtt GraphQLApi.ApiId
+  ApiUrl:
+    Description: URL of your GraphQL API endpoint
+    Value: !Sub
+      - 'https://${ApiId}.appsync-api.${AWS::Region}.${AWS::URLSuffix}/graphql]'
+      - ApiId: !GetAtt GraphQLApi.ApiId

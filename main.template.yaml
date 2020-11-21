@@ -1,0 +1,243 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Top level deployment template for Virtual Slide Viewer'
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Deployment bucket parameters
+        Parameters:
+        - TemplateBucket
+        - TemplateKey
+      - Label:
+          default: General parameters
+        Parameters:
+        - Environment
+        - SupportsConfig
+      - Label:
+          default: VPC template parameters
+        Parameters:
+        - AvailabilityZones
+      - Label:
+          default: Logic template parameters
+        Parameters:
+        - StageName
+        - AllowOrigin
+        - ImagesPath
+      - Label:
+          default: Auth template parameters
+        Parameters:
+        - FromEmailAddress
+        - SesIdentityArn
+        - OAuthScopes
+        - AuthDomainPrefix
+      - Label:
+          default: Web template parameters
+        Parameters:
+        - WebBucketName
+    ParameterLabels:
+      Environment:
+        default: Environment type
+      StageName:
+        default: Stage name
+      AllowOrigin:
+        default: Origin
+      ImagesPath:
+        default: Images path
+      SupportsConfig:
+        default: Use AWS Config
+      AvailabilityZones:
+        default: Availability zones
+      TemplateBucket:
+        default: Deployment S3 bucket name
+      TemplateKey:
+        default: Prefix for deployment template S3 objects
+      FromEmailAddress:
+        default: For Cognito Email configuration
+      SesIdentityArn:
+        default: For Cognito Email configuration
+      OAuthScopes:
+        default: The OAuth scopes to request the User Pool to add to the access token JWT
+      AuthDomainPrefix:
+        default: A custom prefix to use for the sign-up and sign-in pages that are hosted by Amazon Cognito
+      OIDCProviderName:
+        default: A name for the OIDC provider configuration
+      OIDCClientId:
+        default: Client ID from OIDC provider
+      OIDCClientSecret:
+        default: Client secret from OIDC provider
+      OIDCIssuerURL:
+        default: Issuer URL from OIDC provider
+      WebBucketName:
+        default: Name of an S3 bucket to create to deploy the web app
+Parameters:
+  Environment:
+    Description: Runtime environment type.
+    Default: dev
+    Type: String
+    AllowedValues: [prod, dev, test]
+    ConstraintDescription: must specify prod, dev, or test.
+  StageName:
+    Description: Deployment stage name.
+    Default: dev
+    Type: String
+  AllowOrigin:
+    Description: CORS allowed origin.
+    Type: String
+  ImagesPath:
+    Description: File system path to image files.
+    Default: '/mnt/lambda'
+    Type: String
+  SupportsConfig:
+    Description: Is AWS Config Rules already configured for this region? Use ''false''
+      if you are uncertain. See AWS Config Management Console or Deployment Guide
+      for details.
+    AllowedValues:
+    - 'true'
+    - 'false'
+    Default: 'false'
+    Type: String
+  AvailabilityZones:
+    Description: Availability Zones
+    Type: CommaDelimitedList
+    Default: us-east-2a, us-east-2b
+  TemplateBucket:
+    Type: String
+    Description: Deployment S3 bucket name
+    Default: aws-sam-cli-managed-default-samclisourcebucket-3okyxt2msf06
+  TemplateKey:
+    Type: String
+    Description: Prefix for deployment template S3 objects
+    Default: vsv-templates
+  FromEmailAddress:
+    Type: String
+  SesIdentityArn:
+    Type: String
+  OAuthScopes:
+    Type: CommaDelimitedList
+    Description: The OAuth scopes to request the User Pool to add to the access token JWT
+    Default: "phone, email, profile, openid, aws.cognito.signin.user.admin"
+  AuthDomainPrefix:
+    Type: String
+    Description: A custom prefix to use for the sign-up and sign-in pages that are hosted by Amazon Cognito
+  OIDCProviderName:
+    Type: String
+  OIDCClientId:
+    Type: String
+  OIDCClientSecret:
+    Type: String
+  OIDCIssuerURL:
+    Type: String
+  HttpHeaders:
+    Type: String
+    Description: The HTTP headers to set on all responses from CloudFront. Defaults are illustrations only and contain a report-only Cloud Security Policy -- adjust for your application
+    Default: >-
+      {
+        "Content-Security-Policy-Report-Only": "default-src 'none'; img-src 'self' data: https://${ApiId}.execute-api.${AWS::Region}.${AWS::URLSuffix}; script-src 'self'; style-src 'self'; object-src 'none'; connect-src 'self' https://*.amazonaws.com https://*.amazoncognito.com",
+        "Strict-Transport-Security": "max-age=31536000; includeSubdomains; preload",
+        "Referrer-Policy": "same-origin",
+        "X-XSS-Protection": "1; mode=block",
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff"
+      }
+  
+Conditions:
+  LoadConfigRulesTemplate:
+    !Equals
+    - !Ref SupportsConfig
+    - 'true'
+Resources:
+  VpcTemplate:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:
+        !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/vpc.template'
+      TimeoutInMinutes: 20
+      Parameters:
+        RegionAZ1Name:
+          !Select
+          - 0
+          - !Ref AvailabilityZones
+        RegionAZ2Name:
+          !Select
+          - 1
+          - !Ref AvailabilityZones
+        CIDR: 10.100.0.0/16
+        SubnetACIDR: 10.100.10.0/24
+        SubnetBCIDR: 10.100.20.0/24
+        VPCName: VSV
+  EfsTemplate:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - VpcTemplate
+    Properties:
+      TemplateURL:
+        !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/efs.template'
+      TimeoutInMinutes: 20
+      Parameters:
+        VPC: !GetAtt [VpcTemplate, Outputs.VpcId]
+        SecurityGroup: !GetAtt [VpcTemplate, Outputs.SecurityGroupId]
+        Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
+        Environment: !Ref Environment
+  LogicTemplate:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - VpcTemplate
+      - EfsTemplate
+    Properties:
+      TemplateURL:
+        !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/logic.template'
+      TimeoutInMinutes: 20
+      Parameters:
+        Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
+        FileSystem: !GetAtt [EfsTemplate, Outputs.FileSystemId]
+        SecurityGroup: !GetAtt [VpcTemplate, Outputs.SecurityGroupId]
+        AccessPointId: !GetAtt [EfsTemplate, Outputs.AccessPointId]
+        AccessPointArn: !GetAtt [EfsTemplate, Outputs.AccessPointArn]
+        Environment: !Ref Environment
+        StageName: !Ref StageName
+        AllowOrigin: !Ref AllowOrigin
+        ImagesPath: !Ref ImagesPath
+        TableName: !Sub VirtualSlideViewer-${Environment}
+        OAuthScopes: !Ref OAuthScopes
+  DbTemplate:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:
+        !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/db.template'
+      TimeoutInMinutes: 20
+      Parameters:
+        Environment: !Ref Environment
+  AuthTemplate:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - LogicTemplate
+    Properties:
+      TemplateURL:
+        !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/auth.template'
+      TimeoutInMinutes: 20
+      Parameters:
+        CallbackURLs: AlternateDomainNames
+  WebTemplate:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - LogicTemplate
+      - AuthTemplate
+    Properties:
+      TemplateURL:
+        !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/web.template'
+      TimeoutInMinutes: 20
+      Parameters:
+        ApiId: [LogicTemplate, Outputs.ApiId]
+        BucketNameParameter: !Ref WebBucketName
+        HttpHeaders: !Sub HttpHeaders
+        AlternateDomainNames: AlternateDomainNames
+        UserPoolArn: !Ref UserPoolArn
+        UserPoolClientId: !Ref UserPoolClient
+Outputs:
+  MySpaS3Bucket:
+    Description: The S3 Bucket into which my SPA will be uploaded
+    Value: !GetAtt LambdaEdgeProtection.Outputs.S3Bucket
+  WebsiteUrl:
+    Description: URL of the CloudFront distribution that serves your SPA from S3
+    Value: !GetAtt LambdaEdgeProtection.Outputs.WebsiteUrl

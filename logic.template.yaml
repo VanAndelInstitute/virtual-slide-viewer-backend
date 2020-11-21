@@ -1,24 +1,14 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: 'virtual-slide-viewer-backend
-
-  SAM Template for virtual-slide-viewer-backend
-
-  '
+Description: 'Lambda and API Gateway resources for Virtual Slide Viewer'
 Parameters:
-  VpcId:
-    Type: String
-    Description: 'ID of your existing Virtual Private Cloud (VPC)'
-  SubnetIds:
+  Subnets:
     Type: CommaDelimitedList
     Description: 'The list of Subnet IDs, for at least two Availability Zones in the region in your Virtual Private Cloud (VPC)'
-  RouteTableIds:
-    Type: CommaDelimitedList
-    Description: 'Route tables to add VPC endpoint configs'
-  FileSystemId:
+  FileSystem:
     Type: String
     Description: File system id of EfsFileSystem
-  SecurityGroupId:
+  SecurityGroup:
     Type: String
     Description: Security group id of EfsLambdaSecurityGroup
   AccessPointId:
@@ -27,7 +17,7 @@ Parameters:
   AccessPointArn:
     Type: String
     Description: ARN of AccessPoint
-  EnvType:
+  Environment:
     Description: Runtime environment type.
     Default: dev
     Type: String
@@ -58,42 +48,9 @@ Globals:
     Environment:
       Variables:
         IMAGES_PATH: !Ref ImagesPath
-        ENV_TYPE: !Ref EnvType
+        ENV_TYPE: !Ref Environment
 
 Resources:
-  DynamoDbEndpoint:
-    Type: 'AWS::EC2::VPCEndpoint'
-    Properties:
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal: '*'
-            Action: 'dybamodb:PutItem'
-            Resource:
-              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}'
-              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}/indexes/*'
-      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
-      VpcEndpointType: Gateway
-      RouteTableIds: !Ref RouteTableIds
-      VpcId: !Ref VpcId
-  LambdaEndpoint:
-    Type: 'AWS::EC2::VPCEndpoint'
-    Properties:
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal: '*'
-            Action: 'lambda:InvokeFunction'
-            Resource:
-              - !Sub 'arn:aws:lambda:us-east-2:839559484193:function:${AWS::StackName}*'
-      PrivateDnsEnabled: True
-      SecurityGroupIds: !Ref SecurityGroupId
-      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.lambda'
-      SubnetIds: !Ref SubnetIds
-      VpcEndpointType: Interface
-      VpcId: !Ref VpcId
   ImageRequestFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -106,18 +63,18 @@ Resources:
       Environment:
         Variables:
           ALLOW_ORIGIN: !Ref AllowOrigin
-      AutoPublishAlias: !Ref EnvType
+      AutoPublishAlias: !Ref Environment
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
       Policies:
         - EFSWriteAccessPolicy:
-            FileSystem: !Ref FileSystemId
+            FileSystem: !Ref FileSystem
             AccessPoint: !Ref AccessPointId
       VpcConfig:
         SecurityGroupIds:
-          - Ref: SecurityGroupId
-        SubnetIds: !Ref SubnetIds
+          - Ref: SecurityGroup
+        SubnetIds: !Ref Subnets
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
             LocalMountPath: !Ref ImagesPath
@@ -128,35 +85,6 @@ Resources:
             RestApiId: !Ref ImagesApi
             Path: /DeepZoom/{imagePath+}
             Method: GET
-  GenerateTilesFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: vsv
-      Handler: generatetile.lambda_handler
-      Runtime: python3.8
-      Timeout: 480
-      MemorySize: 640
-      FunctionName: !Sub ${AWS::StackName}-GenerateTilesFunction
-      AutoPublishAlias: !Ref EnvType
-      EventInvokeConfig:
-        MaximumEventAgeInSeconds: 120
-        MaximumRetryAttempts: 0
-      Layers:
-        - !Ref OpenSlide
-        - !Ref PillowSIMD
-      Policies:
-        - EFSWriteAccessPolicy:
-            FileSystem: !Ref FileSystemId
-            AccessPoint: !Ref AccessPointId
-        - LambdaInvokePolicy:
-          FunctionName: !Sub ${AWS::StackName}-GenerateTilesFunction
-      VpcConfig:
-        SecurityGroupIds:
-          - Ref: SecurityGroupId
-        SubnetIds: !Ref SubnetIds
-      FileSystemConfigs:
-          - Arn: !Ref AccessPointArn
-            LocalMountPath: !Ref ImagesPath
   FindNewFilesFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -169,17 +97,17 @@ Resources:
       Environment:
         Variables:
           FILE_FUNCTION_NAME: !Sub ${AWS::StackName}-ProcessFileFunction
-      AutoPublishAlias: !Ref EnvType
+      AutoPublishAlias: !Ref Environment
       Policies:
         - EFSWriteAccessPolicy:
-            FileSystem: !Ref FileSystemId
+            FileSystem: !Ref FileSystem
             AccessPoint: !Ref AccessPointId
         - LambdaInvokePolicy:
             FunctionName: !Sub ${AWS::StackName}-ProcessFileFunction
       VpcConfig:
         SecurityGroupIds:
-          - Ref: SecurityGroupId
-        SubnetIds: !Ref SubnetIds
+          - Ref: SecurityGroup
+        SubnetIds: !Ref Subnets
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
             LocalMountPath: !Ref ImagesPath
@@ -204,24 +132,21 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
-          TILES_FUNCTION_NAME: !Sub ${AWS::StackName}-GenerateTilesFunction
-      AutoPublishAlias: !Ref EnvType
+      AutoPublishAlias: !Ref Environment
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
         - !Ref libdmtx
       Policies:
         - EFSWriteAccessPolicy:
-            FileSystem: !Ref FileSystemId
+            FileSystem: !Ref FileSystem
             AccessPoint: !Ref AccessPointId
         - DynamoDBWritePolicy:
             TableName: !Ref TableName
-        - LambdaInvokePolicy:
-            FunctionName: !Sub ${AWS::StackName}-GenerateTilesFunction
       VpcConfig:
         SecurityGroupIds:
-          - Ref: SecurityGroupId
-        SubnetIds: !Ref SubnetIds
+          - Ref: SecurityGroup
+        SubnetIds: !Ref Subnets
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
             LocalMountPath: !Ref ImagesPath
