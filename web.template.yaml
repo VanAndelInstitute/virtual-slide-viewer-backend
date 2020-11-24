@@ -108,7 +108,7 @@ Resources:
           AcmCertificateArn: !Ref ViewerCertificate
           SslSupportMethod: sni-only
           MinimumProtocolVersion: 'TLSv1.2_2019'
-        HttpVerion: http2
+        HttpVersion: http2
         CacheBehaviors:
           - PathPattern: /parseauth
             Compress: true
