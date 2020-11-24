@@ -2,9 +2,10 @@ version = 0.1
 [UAT]
 [UAT.deploy]
 [UAT.deploy.parameters]
-stack_name = "VirtualSlideViewer-db-UAT"
+stack_name = "VirtualSlideViewer-web-UAT"
 s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-3okyxt2msf06"
 s3_prefix = "vsv-backend-UAT"
-region = "us-east-2"
+region = "us-east-1"
 confirm_changeset = true
-capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
+parameter_overrides = "EnvType=uat ApiDomain=1b31zhldfb.execute-api.us-east-2.amazonaws.com DomainName=path-uat.cptac.vai.org UserPoolArn=\"arn:aws:cognito-idp:us-east-2:839559484193:userpool/us-east-2_WZq3tCdLS\" UserPoolClientId=7efr4imo43nd5uvuagr2d50ett"
