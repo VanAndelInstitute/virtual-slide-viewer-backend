@@ -8,7 +8,6 @@ import logging
 logging.basicConfig(level=logging.INFO) 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-from helpers import load_slide, DEEPZOOM_FORMAT
 
 PROPERTY_NAME_APERIO_IMAGEID = u'aperio.ImageID'
 PROPERTY_NAME_APERIO_DATE = u'aperio.Date'
@@ -19,8 +18,6 @@ PROPERTY_NAME_APERIO_APPMAG = u'aperio.AppMag'
 
 IMAGES_PATH = os.environ.get('IMAGES_PATH', '/tmp')
 TABLE_NAME = os.environ.get('TABLE_NAME')
-TILES_FUNCTION_NAME = os.environ.get('TILES_FUNCTION_NAME')
-ENV_TYPE = os.environ.get('ENV_TYPE', 'dev')
 
 
 def lambda_handler(event, context):
@@ -42,11 +39,12 @@ def lambda_handler(event, context):
     label_data = pylibdmtx.decode(label)
     if len(label_data) != 1:
         logger.error('Bad label data')
-        return
-    slide_id = label_data[0].data.decode('ascii')
-    # guess at case id
-    last_index = slide_id.rfind('-')
-    case_id = slide_id[0:last_index]
+        slide_id = case_id = image_id
+    else:
+        slide_id = label_data[0].data.decode('ascii')
+        # guess at case id
+        last_index = slide_id.rfind('-')
+        case_id = slide_id[0:last_index]
 
     # get metadata
     metadata = {}
@@ -71,30 +69,3 @@ def lambda_handler(event, context):
     slide_table = dynamodb.Table(TABLE_NAME)
     slide_table.put_item(Item=metadata)
     logger.info(f'Uploaded metadata for {image_filename}')
-
-    # Pre-compute tiles and cache them for an entire SVS image, using lots of parallel Lambda invocations.
-    dz = load_slide(image_id)
-    dzi_path = os.path.join(IMAGES_PATH, f'{image_id}.dzi')
-    with open(dzi_path, 'wt', encoding='utf-8') as f:
-        f.write(dz.get_dzi(DEEPZOOM_FORMAT))
-    lambda_client = boto3.client('lambda')
-    for level in range(dz.level_count):
-        tiledir = os.path.join(IMAGES_PATH, f'{image_id}_files/{level}/')
-        os.makedirs(tiledir, exist_ok=True)
-
-    start_level = 0
-    for level in dz.native_levels:
-        X, Y = dz.level_tracts[level]
-        if start_level == 0:
-            X = Y = 1
-        for x in range(X):
-            for y in range(Y):
-                event = { 'image_id': image_id, 'levels': list(range(start_level, level+1)), 'tract': [x,y] }
-                lambda_client.invoke(
-                    FunctionName=TILES_FUNCTION_NAME,
-                    InvocationType='Event',
-                    LogType='None',
-                    Payload=json.dumps(event),
-                    Qualifier=ENV_TYPE
-                )
-        start_level = level+1

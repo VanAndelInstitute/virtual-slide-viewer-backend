@@ -4,16 +4,13 @@ import base64
 import json
 import re
 from io import BytesIO
-from slidecache import load_slide, check_cache
+from slidecache import load_slide, check_cache, IMAGES_PATH, DEEPZOOM_TILE_QUALITY
 import logging
 logging.basicConfig(level=logging.INFO) 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-DEEPZOOM_TILE_QUALITY = 70
 ALLOW_ORIGIN = os.environ.get('ALLOW_ORIGIN')
-IMAGES_PATH = os.environ.get('IMAGES_PATH', '/tmp')
-ENV_TYPE = os.environ.get('ENV_TYPE', 'dev')
 
 def respond(success, error=None, status=200, content_type=None):
  

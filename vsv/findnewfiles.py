@@ -13,7 +13,7 @@ ENV_TYPE = os.environ.get('ENV_TYPE', 'dev')
 
 def lambda_handler(event, context):
     os.chdir(IMAGES_PATH)
-    new_image_ids = { f[:-4] for f in glob.glob('*.svs') } - { f[:-4] for f in glob.glob('*.dzi') }
+    new_image_ids = { f[:-4] for f in glob.glob('*.svs') } - { f[:-4] for f in glob.glob('*_files') }
     lambda_client = boto3.client('lambda')
     for image_id in new_image_ids:
         filename = image_id+'.svs'
