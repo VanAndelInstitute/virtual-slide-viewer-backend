@@ -151,7 +151,7 @@ Resources:
             Principal: '*'
             Action: 'lambda:InvokeFunction'
             Resource:
-              - !Sub 'arn:aws:lambda:us-east-2:839559484193:function:${AWS::StackName}*'
+              - !Sub 'arn:aws:lambda:us-east-2:839559484193:function:*'
       PrivateDnsEnabled: True
       SecurityGroupIds:
         - !Ref SecurityGroup
