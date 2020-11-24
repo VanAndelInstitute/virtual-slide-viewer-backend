@@ -132,7 +132,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal: '*'
-            Action: 'dybamodb:PutItem'
+            Action: 'dynamodb:PutItem'
             Resource:
               - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}'
               - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}/indexes/*'

@@ -17,11 +17,10 @@ Parameters:
   AccessPointArn:
     Type: String
     Description: ARN of AccessPoint
-  Environment:
+  EnvType:
     Description: Runtime environment type.
     Default: dev
     Type: String
-    AllowedValues: [prod, dev, test]
     ConstraintDescription: must specify prod, dev, or test.
   StageName:
     Description: Deployment stage name.
@@ -48,7 +47,7 @@ Globals:
     Environment:
       Variables:
         IMAGES_PATH: !Ref ImagesPath
-        ENV_TYPE: !Ref Environment
+        ENV_TYPE: !Ref EnvType
 
 Resources:
   ImageRequestFunction:
@@ -63,7 +62,7 @@ Resources:
       Environment:
         Variables:
           ALLOW_ORIGIN: !Ref AllowOrigin
-      AutoPublishAlias: !Ref Environment
+      AutoPublishAlias: !Ref EnvType
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
@@ -97,7 +96,7 @@ Resources:
       Environment:
         Variables:
           FILE_FUNCTION_NAME: !Sub ${AWS::StackName}-ProcessFileFunction
-      AutoPublishAlias: !Ref Environment
+      AutoPublishAlias: !Ref EnvType
       Policies:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref FileSystem
@@ -132,7 +131,7 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
-      AutoPublishAlias: !Ref Environment
+      AutoPublishAlias: !Ref EnvType
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
