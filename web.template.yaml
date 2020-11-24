@@ -137,6 +137,12 @@ Resources:
                 LambdaFunctionARN: !GetAtt LambdaEdgeProtection.Outputs.SignOutHandler
             TargetOriginId: dummy-origin
             ViewerProtocolPolicy: redirect-to-https
+          - PathPattern: /images/*
+            Compress: true
+            ForwardedValues:
+              QueryString: true
+            TargetOriginId: images
+            ViewerProtocolPolicy: redirect-to-https
         DefaultCacheBehavior:
           Compress: true
           ForwardedValues:
