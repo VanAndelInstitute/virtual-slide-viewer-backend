@@ -1,40 +1,39 @@
-AWSTemplateFormatVersion: 'z2010-09-09'
+AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Example stack to that reuses the auth portion of the serverless application
-  in your own CloudFront distribution. 
-  After deployment, manually update the User Pool client to point the 'Callback URL' and 'Sign out URL' to the URL of the CloudFront distribution.
-  Alternately, add an alternate domain name to the CloudFront distribution and provide the name as parameter to the serverless stack. The alternate
+  S3 and CloudFront resources for Virtual Slide Viewer front end.
+  Add an alternate domain name to the CloudFront distribution and provide the name as parameter to the serverless stack. The alternate
   domain will also require adding a certificate to the Cloudfront Distribution. This alternative will set the User Pool client to the right Callback URL
   and Sign out URL automatically.
-  The sample CloudFront distribution illustrates a full pattern of use -- modify it as needed.
-  The HttpHeaders parameter and corresponding reference in the 'LambdaEdgeProtection' nested application Resource
-  illustrates how to pass information to the underlying SAM app
-  Outputs illustrate retrieving values from the underlying SAM application
-Parameters: 
-  BucketNameParameter: 
+Parameters:
+  EnvType:
+    Description: Runtime environment type.
+    Default: dev
     Type: String
+  BucketName: 
+    Type: String
+    Default: ''
     Description: A legal bucket name.  Must not exist.
   SemanticVersion:
     Type: String
     Description: Semantic version of the back end
     Default: 2.0.3
-  ApiId:
+  ApiDomain:
     Type: String
-    Description: The ID of the API Gateway deployment
+    Description: The URL of the API Gateway deployment
   HttpHeaders:
     Type: String
     Description: The HTTP headers to set on all responses from CloudFront. Defaults are illustrations only and contain a report-only Cloud Security Policy -- adjust for your application
     Default: |-
       {
-        "Content-Security-Policy-Report-Only": "default-src 'none'; img-src 'self' data: https://${ApiId}.execute-api.${AWS::Region}.${AWS::URLSuffix}; script-src 'self'; style-src 'self'; object-src 'none'; connect-src 'self' https://*.amazonaws.com https://*.amazoncognito.com",
+        "Content-Security-Policy-Report-Only": "default-src 'none'; img-src 'self' data: 'https://split_here'; script-src 'self'; style-src 'self'; object-src 'none'; connect-src 'self' https://*.amazonaws.com https://*.amazoncognito.com",
         "Strict-Transport-Security": "max-age=31536000; includeSubdomains; preload",
         "Referrer-Policy": "same-origin",
         "X-XSS-Protection": "1; mode=block",
         "X-Frame-Options": "DENY",
         "X-Content-Type-Options": "nosniff"
       }
-  AlternateDomainNames:
+  DomainName:
     Type: String
   UserPoolArn:
     Type: String
@@ -44,18 +43,18 @@ Parameters:
     Type: String
     Description: CloudFront price class, e.g. PriceClass_200 for most regions (default), PriceClass_All for all regions (the default), PriceClass_100 least expensive (US, Canada, Europe), or PriceClass_All
     Default: PriceClass_100
+Conditions:
+  HasBucketName: !Not [!Equals [!Ref BucketName, '']]
 Resources:
   ApplicationBucket:
     Type: AWS::S3::Bucket
-    DeletionPolicy: Retain
     Properties:
-      BucketName: 
-        Ref: BucketNameParameter
+      BucketName: !If [HasBucketName, !Ref BucketName, !Sub 'vsv-frontend-${EnvType}']
   CloudFrontOriginAccessIdentity:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
       CloudFrontOriginAccessIdentityConfig:
-        Comment: !Sub '${BucketNameParameter}-OAI'
+        Comment: !Sub '${BucketName}-OAI'
   S3AccessPolicyForOAI:
     Type: AWS::S3::BucketPolicy
     Properties: 
@@ -77,20 +76,38 @@ Resources:
         ApplicationId: arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge
         SemanticVersion: !Ref SemanticVersion
       Parameters:
-        HttpHeaders: !Sub HttpHeaders
-        AlternateDomainNames: AlternateDomainNames
+        HttpHeaders:
+          !Join 
+            - ''
+            -
+              - !Select [0, !Split ['split_here', !Ref HttpHeaders]]
+              - !Ref ApiDomain
+              - !Select [1, !Split ['split_here', !Ref HttpHeaders]]
+        AlternateDomainNames: !Ref DomainName
         UserPoolArn: !Ref UserPoolArn
-        UserPoolClientId: !Ref UserPoolClient
-        EnableSPAMode: false
+        UserPoolClientId: !Ref UserPoolClientId
+        EnableSPAMode: true
         CreateCloudFrontDistribution: false
+  ViewerCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties: 
+      DomainName: !Ref DomainName
+      DomainValidationOptions: 
+        - DomainName: cptac.vai.org
+          HostedZoneId: Z0247982HZT5HOP8SFI4
+      ValidationMethod: DNS
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     DependsOn:
       - LambdaEdgeProtection
+      - ViewerCertificate
     Properties:
       DistributionConfig:
-        # Aliases: <your alternate domain names, also pass these to the serverless stack below>
-        # ViewerCertificate: <the config for your HTTPS certificate>
+        Aliases: [!Ref DomainName]
+        ViewerCertificate:
+          AcmCertificateArn: !Ref ViewerCertificate
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: 'TLSv1.2_2019'
         CacheBehaviors:
           - PathPattern: /parseauth
             Compress: true
@@ -136,6 +153,10 @@ Resources:
             Id: dummy-origin
             CustomOriginConfig:
               OriginProtocolPolicy: match-viewer
+          - DomainName: !Ref ApiDomain
+            Id: images
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
           - DomainName: !Sub "${ApplicationBucket}.s3.amazonaws.com"
             Id: protected-origin
             S3OriginConfig:
@@ -147,6 +168,9 @@ Resources:
         PriceClass: !Ref PriceClass
         DefaultRootObject: index.html
 Outputs:
-  WebsiteUrl:
-    Description: URL of the CloudFront distribution that serves your SPA from S3
-    Value: !GetAtt LambdaEdgeProtection.Outputs.WebsiteUrl
+  CloudFrontDistId:
+    Description: ID of the CloudFront distribution that serves your SPA from S3
+    Value: !Ref CloudFrontDistribution
+  CloudFrontDomainName:
+    Description: ID of the CloudFront distribution that serves your SPA from S3
+    Value: !GetAtt CloudFrontDistribution.DomainName

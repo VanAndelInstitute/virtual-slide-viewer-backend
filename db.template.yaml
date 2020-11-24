@@ -1,25 +1,22 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'DynamoDB Table resources for Virtual Slide Viewer'
 Parameters:
-  Environment:
+  EnvType:
     Description: Runtime environment type.
     Default: dev
     Type: String
-    AllowedValues: [prod, dev, test]
     ConstraintDescription: must specify prod, dev, or test.
-  GraphQLApiName:
-    Description: Name of GraphQL API for image metadata.
-    Type: String
-    Default: VsvSlideData-${Environment}
   TableName:
     Description: Name of slide table for image metadata.
     Type: String
-    Default: VsvSlideTable
+    Default: ''
+Conditions:
+  HasTableName: !Not [!Equals [!Ref TableName, '']]
 Resources:
   SlideTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub '${TableName}-${Environment}'
+      TableName: !If [HasTableName, !Ref TableName, !Sub 'vsv-slide-data-${EnvType}']
       AttributeDefinitions: 
         - AttributeName: ImageID
           AttributeType: S
@@ -60,7 +57,7 @@ Resources:
   GraphQLApi:
     Type: AWS::AppSync::GraphQLApi
     Properties: 
-      Name: !Sub VsvSlideData-${Environment}
+      Name: !Sub 'vsv-slide-data-${EnvType}'
       AuthenticationType: API_KEY
   GraphQLApiKey:
     Type: AWS::AppSync::ApiKey
@@ -117,9 +114,9 @@ Resources:
     Type: AWS::AppSync::DataSource
     DependsOn:
       - GraphQLDataSourceRole
-      - GraphQLApi
+      - GraphQLApi 
     Properties: 
-      Name: !Join [ '_', !Split ['-', !Sub '${TableName}_${Environment}']]
+      Name: !Join [ '_', !Split ['-', !Ref SlideTable]]
       Type: AMAZON_DYNAMODB
       ApiId: !GetAtt GraphQLApi.ApiId
       DynamoDBConfig: 
@@ -527,3 +524,6 @@ Outputs:
     Value: !Sub
       - 'https://${ApiId}.appsync-api.${AWS::Region}.${AWS::URLSuffix}/graphql'
       - ApiId: !GetAtt GraphQLApi.ApiId
+  TableName:
+    Description: Name of the created table
+    Value: !Ref SlideTable

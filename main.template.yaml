@@ -179,6 +179,14 @@ Resources:
         SecurityGroup: !GetAtt [VpcTemplate, Outputs.SecurityGroupId]
         Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
         Environment: !Ref Environment
+  DbTemplate:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:
+        !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/db.template'
+      TimeoutInMinutes: 20
+      Parameters:
+        Environment: !Ref Environment
   LogicTemplate:
     Type: AWS::CloudFormation::Stack
     DependsOn:
@@ -198,16 +206,8 @@ Resources:
         StageName: !Ref StageName
         AllowOrigin: !Ref AllowOrigin
         ImagesPath: !Ref ImagesPath
-        TableName: !Sub VirtualSlideViewer-${Environment}
+        TableName: !GetAtt [DbTemplate, Outputs.TableName]
         OAuthScopes: !Ref OAuthScopes
-  DbTemplate:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL:
-        !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/db.template'
-      TimeoutInMinutes: 20
-      Parameters:
-        Environment: !Ref Environment
   AuthTemplate:
     Type: AWS::CloudFormation::Stack
     DependsOn:
