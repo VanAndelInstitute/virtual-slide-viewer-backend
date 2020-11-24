@@ -521,9 +521,10 @@ Outputs:
     Value: !GetAtt GraphQLApi.ApiId
   ApiUrl:
     Description: URL of your GraphQL API endpoint
-    Value: !Sub
-      - 'https://${ApiId}.appsync-api.${AWS::Region}.${AWS::URLSuffix}/graphql'
-      - ApiId: !GetAtt GraphQLApi.ApiId
+    Value: !GetAtt GraphQLApi.GraphQLUrl
   TableName:
     Description: Name of the created table
     Value: !Ref SlideTable
+  ApiKey:
+    Description: API key for GraphQL API
+    Value: !GetAtt GraphQLApiKey.ApiKey
