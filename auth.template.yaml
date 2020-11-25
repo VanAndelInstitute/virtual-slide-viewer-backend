@@ -46,29 +46,6 @@ Resources:
         EmailSendingAccount: DEVELOPER
         From: !Ref FromEmailAddress
         SourceArn: !Ref SesIdentityArn
-
-  UserPoolClient:
-    Type: AWS::Cognito::UserPoolClient
-    Properties:
-      UserPoolId: !Ref UserPool
-      PreventUserExistenceErrors: ENABLED
-      AllowedOAuthScopes: !Ref OAuthScopes
-      AllowedOAuthFlowsUserPoolClient: true
-      AllowedOAuthFlows:
-        - code
-      SupportedIdentityProviders:
-        - COGNITO
-      CallbackURLs:
-        # The following sentinel value will be replaced by Auth@Edge with the CloudFront domain name (if you let Auth@Edge create the CloudFront distribution)
-        - https://example.com/will-be-replaced
-      LogoutURLs:
-        # The following sentinel value will be replaced by Auth@Edge with the CloudFront domain name (if you let Auth@Edge create the CloudFront distribution)
-        - https://example.com/will-be-replaced
-  UserPoolDomain:
-    Type: AWS::Cognito::UserPoolDomain
-    Properties:
-      UserPoolId: !Ref UserPool
-      Domain: !Ref AuthDomainPrefix
   UserPoolIdentityProvider:
     Type: AWS::Cognito::UserPoolIdentityProvider
     Properties:
@@ -86,6 +63,31 @@ Resources:
         name: name
         preferred_username: preferred_username
         email: email
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn:
+      - UserPoolIdentityProvider
+    Properties:
+      UserPoolId: !Ref UserPool
+      PreventUserExistenceErrors: ENABLED
+      AllowedOAuthScopes: !Ref OAuthScopes
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      SupportedIdentityProviders:
+        - COGNITO
+        - !Ref UserPoolIdentityProvider
+      CallbackURLs:
+        # The following sentinel value will be replaced by Auth@Edge with the CloudFront domain name (if you let Auth@Edge create the CloudFront distribution)
+        - https://example.com/will-be-replaced
+      LogoutURLs:
+        # The following sentinel value will be replaced by Auth@Edge with the CloudFront domain name (if you let Auth@Edge create the CloudFront distribution)
+        - https://example.com/will-be-replaced
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      Domain: !Ref AuthDomainPrefix
 Outputs:
   UserPoolId:
     Description: The user pool id to illustrate how to retrieve outputs from the SAM app

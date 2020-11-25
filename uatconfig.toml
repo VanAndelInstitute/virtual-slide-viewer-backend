@@ -2,10 +2,10 @@ version = 0.1
 [UAT]
 [UAT.deploy]
 [UAT.deploy.parameters]
-stack_name = "VirtualSlideViewer-logic-UAT"
+stack_name = "VirtualSlideViewer-auth-UAT"
 s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-3okyxt2msf06"
 s3_prefix = "vsv-backend-UAT"
 region = "us-east-2"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "VpcId=vpc-0debc1e15b05d7340 Subnets=subnet-0f64acc617311f0a9,subnet-019899523293b0e59 FileSystem=fs-f79efd8f SecurityGroup=sg-0d1ca19af4ca5d388 AccessPointId=fsap-0f490959b113da139 AccessPointArn=\"arn:aws:elasticfilesystem:us-east-2:839559484193:access-point/fsap-0f490959b113da139\" EnvType=\"UAT\" StageName=\"test\" AllowOrigin=\"https://path-uat.cptac.vai.org\" ImagesPath=\"/mnt/lambda\" TableName=\"VsvSlideTable\""
+parameter_overrides = "FromEmailAddress=\"CPTAC <cptac@vai.org>\" SesIdentityArn=\"arn:aws:ses:us-east-1:839559484193:identity/cptac@vai.org\" OAuthScopes=phone,email,profile,openid,aws.cognito.signin.user.admin AuthDomainPrefix=cptac-uat OIDCProviderName=VAI OIDCClientId=4214de37-0cd1-4238-86ce-04ca11e2161b OIDCClientSecret=\"optH~3r3c4cr~aS1-.YA8o.3HOoU_1mzQB\" OIDCIssuerURL=\"https://login.microsoftonline.com/5aad1a34-d695-43ac-9334-777b4e10019b/v2.0\""
