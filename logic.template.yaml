@@ -149,6 +149,46 @@ Resources:
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
             LocalMountPath: !Ref ImagesPath
+  CheckFileTransferStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: vsv
+      Handler: checkfiletransferstatus.lambda_handler
+      Runtime: python3.8
+      Timeout: 300
+      MemorySize: 256
+      FunctionName: !Sub ${AWS::StackName}-CheckFileTransferStatusFunction
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+      AutoPublishAlias: !Ref EnvType
+      Policies:
+        - EFSWriteAccessPolicy:
+            FileSystem: !Ref FileSystem
+            AccessPoint: !Ref AccessPointId
+        - DynamoDBReadPolicy:
+            TableName: !Ref TableName
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - datasync:DescribeTask
+                - datasync:StartTaskExecution
+              Resource: 'arn:aws:datasync:us-east-2:839559484193:task/task-029ab23ed41f8d713'
+      VpcConfig:
+        SecurityGroupIds:
+          - Ref: SecurityGroup
+        SubnetIds: !Ref Subnets
+      FileSystemConfigs:
+          - Arn: !Ref AccessPointArn
+            LocalMountPath: !Ref ImagesPath
+      Events:
+        ImagesApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ImagesApi
+            Path: /CheckFileTransferStatus
+            Method: PUT
   OpenSlide:
     Type: AWS::Serverless::LayerVersion
     Properties:

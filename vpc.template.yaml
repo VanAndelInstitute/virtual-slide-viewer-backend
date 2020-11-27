@@ -132,10 +132,12 @@ Resources:
         Statement:
           - Effect: Allow
             Principal: '*'
-            Action: 'dynamodb:PutItem'
+            Action:
+              - 'dynamodb:PutItem'
+              - 'dynamodb:Query'
             Resource:
               - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}'
-              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}/indexes/*'
+              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}/index/*'
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
       VpcEndpointType: Gateway
       RouteTableIds:

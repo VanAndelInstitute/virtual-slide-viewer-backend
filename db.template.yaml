@@ -34,6 +34,12 @@ Resources:
               KeyType: HASH
           Projection:
             ProjectionType: KEYS_ONLY
+        - IndexName: Filename-index
+          KeySchema:
+            - AttributeName: Filename
+              KeyType: HASH
+          Projection:
+            ProjectionType: KEYS_ONLY
         - IndexName: Status-SlideID-index
           KeySchema:
             - AttributeName: Status

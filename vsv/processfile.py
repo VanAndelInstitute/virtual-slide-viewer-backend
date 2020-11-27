@@ -47,23 +47,24 @@ def lambda_handler(event, context):
         case_id = slide_id[0:last_index]
 
     # get metadata
-    metadata = {}
-    metadata['ImageID'] = image_id
-    metadata['SlideID'] = slide_id
-    metadata['CaseID'] = case_id
-    metadata['Status'] = 'NEW'
     width, height = osr.dimensions
-    metadata['width'] = width
-    metadata['height'] = height
     scan_date = osr.properties.get(PROPERTY_NAME_APERIO_DATE)
     scan_time = osr.properties.get(PROPERTY_NAME_APERIO_TIME)
     scan_timezone = osr.properties.get(PROPERTY_NAME_APERIO_TZ)
     scandate = datetime.strptime(f'{scan_date} {scan_time} {scan_timezone}', '%m/%d/%y %H:%M:%S %Z%z')
-    metadata['ScanDate'] = scandate.isoformat()
-    metadata['MPP'] = osr.properties.get(PROPERTY_NAME_APERIO_MPP)
-    metadata['AppMag'] = osr.properties.get(PROPERTY_NAME_APERIO_APPMAG)
-    metadata['lastModified'] = datetime.utcnow().isoformat()
-    
+    metadata = {
+        'Filename': image_filename,
+        'ImageID': image_id,
+        'SlideID': slide_id,
+        'CaseID': case_id,
+        'Status': 'NEW',
+        'width': width,
+        'height': height,
+        'ScanDate': scandate.isoformat(),
+        'MPP': osr.properties.get(PROPERTY_NAME_APERIO_MPP),
+        'AppMag': osr.properties.get(PROPERTY_NAME_APERIO_APPMAG),
+        'lastModified': datetime.utcnow().isoformat(),
+    }
     # upload metadata to slide table in DynamoDB
     dynamodb = boto3.resource('dynamodb')
     slide_table = dynamodb.Table(TABLE_NAME)
