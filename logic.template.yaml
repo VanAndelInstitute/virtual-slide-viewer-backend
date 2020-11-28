@@ -217,7 +217,7 @@ Resources:
     Type: AWS::Serverless::Api
     Properties:
       StageName: !Ref StageName
-      BinaryMediaTypes: ['*/*']
+      BinaryMediaTypes: ['image/*']
       EndpointConfiguration:
         Type: REGIONAL
 
