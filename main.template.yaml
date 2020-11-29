@@ -22,7 +22,6 @@ Metadata:
           default: Logic template parameters
         Parameters:
         - StageName
-        - AllowOrigin
         - ImagesPath
       - Label:
           default: Auth template parameters
@@ -36,12 +35,10 @@ Metadata:
         Parameters:
         - WebBucketName
     ParameterLabels:
-      Environment:
+      EnvType:
         default: Environment type
       StageName:
         default: Stage name
-      AllowOrigin:
-        default: Origin
       ImagesPath:
         default: Images path
       SupportsConfig:
@@ -71,7 +68,7 @@ Metadata:
       WebBucketName:
         default: Name of an S3 bucket to create to deploy the web app
 Parameters:
-  Environment:
+  EnvType:
     Description: Runtime environment type.
     Default: dev
     Type: String
@@ -80,9 +77,6 @@ Parameters:
   StageName:
     Description: Deployment stage name.
     Default: dev
-    Type: String
-  AllowOrigin:
-    Description: CORS allowed origin.
     Type: String
   ImagesPath:
     Description: File system path to image files.
@@ -178,20 +172,25 @@ Resources:
         VPC: !GetAtt [VpcTemplate, Outputs.VpcId]
         SecurityGroup: !GetAtt [VpcTemplate, Outputs.SecurityGroupId]
         Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
-        Environment: !Ref Environment
+        EnvType: !Ref EnvType
   DbTemplate:
     Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - VpcTemplate
     Properties:
       TemplateURL:
         !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/db.template'
       TimeoutInMinutes: 20
       Parameters:
-        Environment: !Ref Environment
+        EnvType: !Ref EnvType
+        VPC: !GetAtt [VpcTemplate, Outputs.VpcId]
+        RouteTableId:  !GetAtt [VpcTemplate, Outputs.RouteTableId]
   LogicTemplate:
     Type: AWS::CloudFormation::Stack
     DependsOn:
       - VpcTemplate
       - EfsTemplate
+      - DbTemplate
     Properties:
       TemplateURL:
         !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/logic.template'
@@ -202,9 +201,8 @@ Resources:
         SecurityGroup: !GetAtt [VpcTemplate, Outputs.SecurityGroupId]
         AccessPointId: !GetAtt [EfsTemplate, Outputs.AccessPointId]
         AccessPointArn: !GetAtt [EfsTemplate, Outputs.AccessPointArn]
-        Environment: !Ref Environment
+        EnvType: !Ref EnvType
         StageName: !Ref StageName
-        AllowOrigin: !Ref AllowOrigin
         ImagesPath: !Ref ImagesPath
         TableName: !GetAtt [DbTemplate, Outputs.TableName]
         OAuthScopes: !Ref OAuthScopes

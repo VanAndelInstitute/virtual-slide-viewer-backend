@@ -5,7 +5,12 @@ Parameters:
     Description: Runtime environment type.
     Default: dev
     Type: String
-    ConstraintDescription: must specify prod, dev, or test.
+  VPC:
+    Type: String
+    Description: 'ID of your existing Virtual Private Cloud (VPC)'
+  RouteTableId:
+    Type: String
+    Description: 'The ID of the created main route table of the VPC'
 Resources:
   SlideTable:
     Type: AWS::DynamoDB::Table
@@ -54,7 +59,29 @@ Resources:
       KeySchema: 
         - AttributeName: ImageID
           KeyType: HASH
-
+  DynamoDbEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    DependsOn:
+      - SlideTable
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action:
+              - 'dynamodb:PutItem'
+              - 'dynamodb:UpdateItem'
+              - 'dynamodb:BatchWriteItem'
+              - 'dynamodb:Query'
+            Resource:
+              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${SlideTable}'
+              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${SlideTable}/index/*'
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref RouteTableId
+      VpcId: !Ref VPC
   GraphQLApi:
     Type: AWS::AppSync::GraphQLApi
     Properties: 

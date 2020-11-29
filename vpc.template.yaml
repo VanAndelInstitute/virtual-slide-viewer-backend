@@ -124,25 +124,6 @@ Resources:
           FromPort: 0
           ToPort: 65535
           IpProtocol: tcp
-  DynamoDbEndpoint:
-    Type: AWS::EC2::VPCEndpoint
-    Properties:
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal: '*'
-            Action:
-              - 'dynamodb:PutItem'
-              - 'dynamodb:Query'
-            Resource:
-              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}'
-              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}/index/*'
-      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
-      VpcEndpointType: Gateway
-      RouteTableIds:
-        - !Ref RouteTableMain
-      VpcId: !Ref VPC
   LambdaEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:

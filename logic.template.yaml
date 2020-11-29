@@ -26,9 +26,6 @@ Parameters:
     Description: Deployment stage name.
     Default: dev
     Type: String
-  AllowOrigin:
-    Description: CORS allowed origin.
-    Type: String
   ImagesPath:
     Description: File system path to image files.
     Default: '/mnt/lambda'
@@ -59,9 +56,6 @@ Resources:
       Timeout: 15
       MemorySize: 640
       FunctionName: !Sub ${AWS::StackName}-ImageRequestFunction
-      Environment:
-        Variables:
-          ALLOW_ORIGIN: !Ref AllowOrigin
       AutoPublishAlias: !Ref EnvType
       Layers:
         - !Ref OpenSlide

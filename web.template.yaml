@@ -10,7 +10,7 @@ Parameters:
     Description: Runtime environment type.
     Default: dev
     Type: String
-  BucketName: 
+  BucketName:
     Type: String
     Default: ''
     Description: A legal bucket name.  Must not exist.
@@ -21,12 +21,16 @@ Parameters:
   ApiDomain:
     Type: String
     Description: The URL of the API Gateway deployment
+  StageName:
+    Description: Deployment stage name.
+    Default: dev
+    Type: String
   HttpHeaders:
     Type: String
     Description: The HTTP headers to set on all responses from CloudFront. Defaults are illustrations only and contain a report-only Cloud Security Policy -- adjust for your application
     Default: |-
       {
-        "Content-Security-Policy-Report-Only": "default-src 'none'; img-src 'self' data: 'https://split_here'; script-src 'self'; style-src 'self'; object-src 'none'; connect-src 'self' https://*.amazonaws.com https://*.amazoncognito.com",
+        "Content-Security-Policy-Report-Only": "default-src 'none'; img-src 'self' data:; script-src 'self'; style-src 'self' 'nonce-7947e7bc32c84095a72ca1854c8d42bd'; font-src 'self' https://fonts.gstatic.com; object-src 'none'; connect-src 'self' https://*.amazonaws.com https://*.amazoncognito.com",
         "Strict-Transport-Security": "max-age=31536000; includeSubdomains; preload",
         "Referrer-Policy": "same-origin",
         "X-XSS-Protection": "1; mode=block",
@@ -77,12 +81,7 @@ Resources:
         SemanticVersion: !Ref SemanticVersion
       Parameters:
         HttpHeaders:
-          !Join 
-            - ''
-            -
-              - !Select [0, !Split ['split_here', !Ref HttpHeaders]]
-              - !Ref ApiDomain
-              - !Select [1, !Split ['split_here', !Ref HttpHeaders]]
+          !Ref HttpHeaders
         AlternateDomainNames: !Ref DomainName
         UserPoolArn: !Ref UserPoolArn
         UserPoolClientId: !Ref UserPoolClientId
@@ -96,11 +95,46 @@ Resources:
         - DomainName: cptac.vai.org
           HostedZoneId: Z0247982HZT5HOP8SFI4
       ValidationMethod: DNS
+  RequestRemoveFirstPathElementFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: nodejs12.x
+      Timeout: 5
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      AssumeRolePolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            -
+              Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+                  - edgelambda.amazonaws.com
+              Action: sts:AssumeRole
+      EventInvokeConfig:
+        MaximumEventAgeInSeconds: 60
+        MaximumRetryAttempts: 0
+      InlineCode: |-
+        'use strict';
+        // lambda@edge Origin Request trigger to remove the first path element
+        // compatible with either Node.js 6.10 or 8.10 Lambda runtime environment
+        exports.handler = (event, context, callback) => {
+            const request = event.Records[0].cf.request;           // extract the request object
+            request.uri = request.uri.replace(/^\/[^\/]+\//,'/');  // modify the URI
+            return callback(null, request);                        // return control to CloudFront
+        };
+  RequestRemoveFirstPathElementFunctionVersion:
+    Type: AWS::Lambda::Version
+    Properties: 
+      FunctionName: !Ref RequestRemoveFirstPathElementFunction
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     DependsOn:
       - LambdaEdgeProtection
       - ViewerCertificate
+      - RequestRemoveFirstPathElementFunction
     Properties:
       DistributionConfig:
         Aliases: [!Ref DomainName]
@@ -141,6 +175,11 @@ Resources:
             Compress: true
             ForwardedValues:
               QueryString: true
+              Headers:
+                - Accept
+            LambdaFunctionAssociations:
+            - EventType: viewer-request
+              LambdaFunctionARN: !Ref RequestRemoveFirstPathElementFunctionVersion
             TargetOriginId: images
             ViewerProtocolPolicy: redirect-to-https
         DefaultCacheBehavior:
@@ -162,6 +201,7 @@ Resources:
               OriginProtocolPolicy: match-viewer
           - DomainName: !Ref ApiDomain
             Id: images
+            OriginPath: !Sub /${StageName}/DeepZoom
             CustomOriginConfig:
               OriginProtocolPolicy: https-only
           - DomainName: !Sub "${ApplicationBucket}.s3.amazonaws.com"

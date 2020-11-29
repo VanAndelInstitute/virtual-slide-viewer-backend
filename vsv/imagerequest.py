@@ -10,18 +10,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-ALLOW_ORIGIN = os.environ.get('ALLOW_ORIGIN')
-
 def respond(success, error=None, status=200, content_type=None):
  
     response = {
         'statusCode': status,
         'body': ''.join(tb.format_exception(type(error), error, error.__traceback__)) if error else success,
-        'headers': {
-            'Access-Control-Allow-Headers' : 'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token',
-            'Access-Control-Allow-Origin': ALLOW_ORIGIN,
-            'Access-Control-Allow-Methods': 'OPTIONS,GET'
-        },
+        'headers': {},
     }
     if content_type:
         response['headers']['Content-Type'] = content_type
