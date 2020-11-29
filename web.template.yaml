@@ -215,6 +215,9 @@ Resources:
         PriceClass: !Ref PriceClass
         DefaultRootObject: index.html
 Outputs:
+  BucketName:
+    Description: Name of the created bucket for front-end resources
+    Value: ApplicationBucket
   CloudFrontDistId:
     Description: ID of the CloudFront distribution that serves your SPA from S3
     Value: !Ref CloudFrontDistribution

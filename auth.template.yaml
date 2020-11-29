@@ -89,7 +89,10 @@ Resources:
       UserPoolId: !Ref UserPool
       Domain: !Ref AuthDomainPrefix
 Outputs:
-  UserPoolId:
-    Description: The user pool id to illustrate how to retrieve outputs from the SAM app
-    Value: !Ref UserPool
+  UserPoolArn:
+    Description: The ARN of the created user pool
+    Value: !GetAtt UserPool.Arn
+  UserPoolClientId:
+    Description: The ID of the created user pool client
+    Value: !Ref UserPoolClient
   

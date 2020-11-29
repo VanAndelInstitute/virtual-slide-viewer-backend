@@ -72,8 +72,6 @@ Parameters:
     Description: Runtime environment type.
     Default: dev
     Type: String
-    AllowedValues: [prod, dev, test]
-    ConstraintDescription: must specify prod, dev, or test.
   StageName:
     Description: Deployment stage name.
     Default: dev
@@ -205,17 +203,20 @@ Resources:
         StageName: !Ref StageName
         ImagesPath: !Ref ImagesPath
         TableName: !GetAtt [DbTemplate, Outputs.TableName]
-        OAuthScopes: !Ref OAuthScopes
   AuthTemplate:
     Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - LogicTemplate
     Properties:
       TemplateURL:
         !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/auth.template'
       TimeoutInMinutes: 20
       Parameters:
-        CallbackURLs: AlternateDomainNames
+        AuthDomainPrefix: cptac-uat
+        FromEmailAddress: 'CPTAC <cptac@vai.org>'
+        OIDCClientId: '4214de37-0cd1-4238-86ce-04ca11e2161b'
+        OIDCClientSecret: 'optH~3r3c4cr~aS1-.YA8o.3HOoU_1mzQB'
+        OIDCIssuerURL: 'https://login.microsoftonline.com/5aad1a34-d695-43ac-9334-777b4e10019b/v2.0'
+        OIDCProviderName: VAI
+        SesIdentityArn: 'arn:aws:ses:us-east-1:839559484193:identity/cptac@vai.org'
   WebTemplate:
     Type: AWS::CloudFormation::Stack
     DependsOn:
@@ -226,16 +227,8 @@ Resources:
         !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/web.template'
       TimeoutInMinutes: 20
       Parameters:
-        ApiId: [LogicTemplate, Outputs.ApiId]
-        BucketNameParameter: !Ref WebBucketName
-        HttpHeaders: !Sub HttpHeaders
-        AlternateDomainNames: AlternateDomainNames
-        UserPoolArn: !Ref UserPoolArn
-        UserPoolClientId: !Ref UserPoolClient
-Outputs:
-  MySpaS3Bucket:
-    Description: The S3 Bucket into which my SPA will be uploaded
-    Value: !GetAtt LambdaEdgeProtection.Outputs.S3Bucket
-  WebsiteUrl:
-    Description: URL of the CloudFront distribution that serves your SPA from S3
-    Value: !GetAtt LambdaEdgeProtection.Outputs.WebsiteUrl
+        ApiDomain: [LogicTemplate, Outputs.ApiDomain]
+        StageName: !Ref StageName
+        DomainName: DomainName
+        UserPoolArn: [AuthTemplate, Outputs.UserPoolArn]
+        UserPoolClientId: [AuthTemplate, Outputs.UserPoolClientId]

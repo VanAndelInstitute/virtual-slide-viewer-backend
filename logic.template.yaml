@@ -18,21 +18,23 @@ Parameters:
     Type: String
     Description: ARN of AccessPoint
   EnvType:
+    Type: String
     Description: Runtime environment type.
     Default: dev
-    Type: String
-    ConstraintDescription: must specify prod, dev, or test.
   StageName:
+    Type: String
     Description: Deployment stage name.
     Default: dev
-    Type: String
   ImagesPath:
+    Type: String
     Description: File system path to image files.
     Default: '/mnt/lambda'
-    Type: String
   TableName:
-    Description: Slide table for image metadata.
     Type: String
+    Description: Slide table for image metadata.
+  DataSyncTaskArn:
+    Type: String
+    Description: DataSync Task ID for image transfers
 
 Conditions:
   UseStageName: !Not [!Equals [!Ref StageName, '']]
@@ -55,8 +57,6 @@ Resources:
       Runtime: python3.8
       Timeout: 15
       MemorySize: 640
-      FunctionName: !Sub ${AWS::StackName}-ImageRequestFunction
-      AutoPublishAlias: !Ref EnvType
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
@@ -78,41 +78,6 @@ Resources:
             RestApiId: !Ref ImagesApi
             Path: /DeepZoom/{imagePath+}
             Method: GET
-  FindNewFilesFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: vsv
-      Handler: findnewfiles.lambda_handler
-      Runtime: python3.8
-      Timeout: 30
-      MemorySize: 128
-      FunctionName: !Sub ${AWS::StackName}-FindNewFilesFunction
-      Environment:
-        Variables:
-          FILE_FUNCTION_NAME: !Sub ${AWS::StackName}-ProcessFileFunction
-      AutoPublishAlias: !Ref EnvType
-      Policies:
-        - EFSWriteAccessPolicy:
-            FileSystem: !Ref FileSystem
-            AccessPoint: !Ref AccessPointId
-        - LambdaInvokePolicy:
-            FunctionName: !Sub ${AWS::StackName}-ProcessFileFunction
-      VpcConfig:
-        SecurityGroupIds:
-          - Ref: SecurityGroup
-        SubnetIds: !Ref Subnets
-      FileSystemConfigs:
-          - Arn: !Ref AccessPointArn
-            LocalMountPath: !Ref ImagesPath
-      Events:
-        DataSyncSuccess:
-          Type: EventBridgeRule
-          Properties:
-            Pattern:
-              source: [aws.datasync]
-              detail-type: [DataSync Task Execution State Change]
-              detail:
-                State: [SUCCESS]
   ProcessFileFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -121,11 +86,9 @@ Resources:
       Runtime: python3.8
       Timeout: 450
       MemorySize: 1536
-      FunctionName: !Sub ${AWS::StackName}-ProcessFileFunction
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
-      AutoPublishAlias: !Ref EnvType
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
@@ -143,6 +106,45 @@ Resources:
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
             LocalMountPath: !Ref ImagesPath
+  ProcessFileFunctionVersion:
+    Type: AWS::Lambda::Version
+    Properties: 
+      FunctionName: !Ref ProcessFileFunction
+  FindNewFilesFunction:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - ProcessFileFunction
+    Properties:
+      CodeUri: vsv
+      Handler: findnewfiles.lambda_handler
+      Runtime: python3.8
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          FILE_FUNCTION_NAME: !Ref ProcessFileFunctionVersion
+      Policies:
+        - EFSWriteAccessPolicy:
+            FileSystem: !Ref FileSystem
+            AccessPoint: !Ref AccessPointId
+        - LambdaInvokePolicy:
+            FunctionName: !Ref ProcessFileFunction
+      VpcConfig:
+        SecurityGroupIds:
+          - Ref: SecurityGroup
+        SubnetIds: !Ref Subnets
+      FileSystemConfigs:
+          - Arn: !Ref AccessPointArn
+            LocalMountPath: !Ref ImagesPath
+      Events:
+        DataSyncSuccess:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source: [aws.datasync]
+              detail-type: [DataSync Task Execution State Change]
+              detail:
+                State: [SUCCESS]
   CheckFileTransferStatusFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -151,11 +153,9 @@ Resources:
       Runtime: python3.8
       Timeout: 300
       MemorySize: 256
-      FunctionName: !Sub ${AWS::StackName}-CheckFileTransferStatusFunction
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
-      AutoPublishAlias: !Ref EnvType
       Policies:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref FileSystem
@@ -168,7 +168,7 @@ Resources:
               Action:
                 - datasync:DescribeTask
                 - datasync:StartTaskExecution
-              Resource: 'arn:aws:datasync:us-east-2:839559484193:task/task-029ab23ed41f8d713'
+              Resource: !Ref DataSyncTaskArn
       VpcConfig:
         SecurityGroupIds:
           - Ref: SecurityGroup
@@ -216,12 +216,15 @@ Resources:
         Type: REGIONAL
 
 Outputs:
+  ApiId:
+    Description: Api id of ImagesApi
+    Value: !Ref ImagesApi
+  ApiDomain:
+    Description: FQDN of ImagesApi
+    Value: !Sub ${ImagesApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}
   ApiUrl:
     Description: URL of your API endpoint
     Value: !If
       - UseStageName
       - !Sub https://${ImagesApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/${StageName}/
       - !Sub https://${ImagesApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/]
-  ApiId:
-    Description: Api id of ImagesApi
-    Value: !Ref ImagesApi

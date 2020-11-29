@@ -6,8 +6,7 @@ for DeepZoom tiles by using [OpenSeadragon](https://openseadragon.github.io/) to
 The infrastructure code is currently a [SAM template](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-getting-started.html). You'll need to [install Docker to build](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-using-build.html) the OpenSlide and libdmtx Lambda layers.
 
 ```
-$ cp logic.template.yaml template.yaml
-$ sam build -u
+$ sam build -u -t logic.template.yaml
 $ sam deploy
 ```
 

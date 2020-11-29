@@ -21,7 +21,6 @@ def lambda_handler(event, context):
             FunctionName=FILE_FUNCTION_NAME,
             InvocationType='Event',
             LogType='None',
-            Payload=json.dumps({ 'filename': filename }),
-            Qualifier=ENV_TYPE
+            Payload=json.dumps({ 'filename': filename })
         )
         logger.info(f'Processing new file "{filename}"')
