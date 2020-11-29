@@ -6,17 +6,10 @@ Parameters:
     Default: dev
     Type: String
     ConstraintDescription: must specify prod, dev, or test.
-  TableName:
-    Description: Name of slide table for image metadata.
-    Type: String
-    Default: ''
-Conditions:
-  HasTableName: !Not [!Equals [!Ref TableName, '']]
 Resources:
   SlideTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !If [HasTableName, !Ref TableName, !Sub 'vsv-slide-data-${EnvType}']
       AttributeDefinitions: 
         - AttributeName: ImageID
           AttributeType: S
@@ -25,6 +18,8 @@ Resources:
         - AttributeName: Status
           AttributeType: S
         - AttributeName: SlideID
+          AttributeType: S
+        - AttributeName: Filename
           AttributeType: S
       BillingMode: PAY_PER_REQUEST
       GlobalSecondaryIndexes: 
@@ -63,7 +58,7 @@ Resources:
   GraphQLApi:
     Type: AWS::AppSync::GraphQLApi
     Properties: 
-      Name: !Sub 'vsv-slide-data-${EnvType}'
+      Name: !Sub 'vsv-metadata-${EnvType}'
       AuthenticationType: API_KEY
   GraphQLApiKey:
     Type: AWS::AppSync::ApiKey
@@ -74,7 +69,7 @@ Resources:
   GraphQLDataSourceRole:
     Type: AWS::IAM::Role
     Properties: 
-      RoleName: !Sub appsync-ds-ddb-${TableName}
+      RoleName: !Sub appsync-ds-ddb
       AssumeRolePolicyDocument: |-
         {
           "Version": "2012-10-17",
@@ -91,13 +86,12 @@ Resources:
       Description: Allows the AWS AppSync service to access your data source.
       Path: '/service-role/'
       Policies: 
-        - PolicyName: !Sub appsync-ds-ddb-${TableName}
+        - PolicyName: !Sub appsync-ds-ddb
           PolicyDocument: !Sub |-
             {
                 "Version": "2012-10-17",
                 "Statement": [
                     {
-                        "Sid": "VisualEditor0",
                         "Effect": "Allow",
                         "Action": [
                             "dynamodb:BatchGetItem",
@@ -110,8 +104,8 @@ Resources:
                             "dynamodb:UpdateItem"
                         ],
                         "Resource": [
-                            "arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}",
-                            "arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}/*"
+                            "arn:aws:dynamodb:us-east-2:839559484193:table/${SlideTable}",
+                            "arn:aws:dynamodb:us-east-2:839559484193:table/${SlideTable}/*"
                         ]
                     }
                 ]
@@ -295,9 +289,9 @@ Resources:
       DataSourceName: !GetAtt GraphQLDataSource.Name
       FieldName: getSlides
       Kind: UNIT
-      RequestMappingTemplate: |-
+      RequestMappingTemplate: !Sub |-
         #set($ids = [])
-        #foreach($id in ${ctx.args.ImageIDs})
+        #foreach($id in $ctx.args.ImageIDs)
             #set($map = {})
             $util.qr($map.put("ImageID", $util.dynamodb.toString($id)))
             $util.qr($ids.add($map))
@@ -307,17 +301,17 @@ Resources:
             "version" : "2018-05-29",
             "operation" : "BatchGetItem",
             "tables" : {
-                "cptac-slides-dev": {
+                "${SlideTable}": {
                     "keys": $util.toJson($ids),
                     "consistentRead": true
                 }
             }
         }
-      ResponseMappingTemplate: |-
+      ResponseMappingTemplate: !Sub |-
         #if($ctx.error)
             $utils.appendError($ctx.error.message, $ctx.error.message)
         #end
-        $utils.toJson($ctx.result.data.cptac-slides-dev)
+        $utils.toJson($ctx.result.data.${SlideTable})
       TypeName: Query
   listSlidesResolver:
     Type: AWS::AppSync::Resolver
@@ -499,9 +493,9 @@ Resources:
       DataSourceName: !GetAtt GraphQLDataSource.Name
       FieldName: deleteSlides
       Kind: UNIT
-      RequestMappingTemplate: |-
+      RequestMappingTemplate: !Sub |-
         #set($ids = [])
-        #foreach($id in ${ctx.args.ImageIDs})
+        #foreach($id in $ctx.args.ImageIDs)
             #set($map = {})
             $util.qr($map.put("ImageID", $util.dynamodb.toString($id)))
             $util.qr($ids.add($map))
@@ -511,14 +505,14 @@ Resources:
             "version" : "2018-05-29",
             "operation" : "BatchDeleteItem",
             "tables" : {
-                "cptac-slides-dev": $util.toJson($ids)
+                "${SlideTable}": $util.toJson($ids)
             }
         }
-      ResponseMappingTemplate: |-
+      ResponseMappingTemplate: !Sub |-
         #if ($ctx.error)
             $util.error($ctx.error.message, $ctx.error.type, null, $ctx.result.data.unprocessedKeys)
         #end
-        $util.toJson($ctx.result.data.cptac-slides-dev)
+        $util.toJson($ctx.result.data.${SlideTable})
       TypeName: Mutation
 
 Outputs:
