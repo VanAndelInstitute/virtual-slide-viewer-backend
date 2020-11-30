@@ -21,10 +21,6 @@ Parameters:
   ApiDomain:
     Type: String
     Description: The URL of the API Gateway deployment
-  StageName:
-    Description: Deployment stage name.
-    Default: dev
-    Type: String
   HttpHeaders:
     Type: String
     Description: The HTTP headers to set on all responses from CloudFront. Defaults are illustrations only and contain a report-only Cloud Security Policy -- adjust for your application
@@ -171,16 +167,13 @@ Resources:
                 LambdaFunctionARN: !GetAtt LambdaEdgeProtection.Outputs.SignOutHandler
             TargetOriginId: dummy-origin
             ViewerProtocolPolicy: redirect-to-https
-          - PathPattern: /images/*
+          - PathPattern: /DeepZoom/*
             Compress: true
             ForwardedValues:
               QueryString: true
               Headers:
                 - Accept
-            LambdaFunctionAssociations:
-            - EventType: viewer-request
-              LambdaFunctionARN: !Ref RequestRemoveFirstPathElementFunctionVersion
-            TargetOriginId: images
+            TargetOriginId: API
             ViewerProtocolPolicy: redirect-to-https
         DefaultCacheBehavior:
           Compress: true
@@ -200,10 +193,11 @@ Resources:
             CustomOriginConfig:
               OriginProtocolPolicy: match-viewer
           - DomainName: !Ref ApiDomain
-            Id: images
-            OriginPath: !Sub /${StageName}/DeepZoom
+            Id: API
             CustomOriginConfig:
               OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
           - DomainName: !Sub "${ApplicationBucket}.s3.amazonaws.com"
             Id: protected-origin
             S3OriginConfig:

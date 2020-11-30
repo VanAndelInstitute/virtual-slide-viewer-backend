@@ -8,4 +8,4 @@ s3_prefix = "vsv-backend-prod"
 region = "us-east-2"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "VpcId=\"vpc-048ce5ae2f54da08c\" SubnetIds=\"subnet-08ecf506e5200f694,subnet-0326e02bf0573e3fd\" RouteTableIds=\"rtb-0321f778ead0920ff\" FileSystemId=\"fs-137f1a6b\" SecurityGroupId=\"sg-00b45d492fbf21c53\" AccessPointId=\"fsap-0e55010ae11280b0a\" AccessPointArn=\"arn:aws:elasticfilesystem:us-east-2:839559484193:access-point/fsap-0e55010ae11280b0a\" EnvType=\"prod\" StageName=\"prod\" ImagesPath=\"/mnt/lambda\" TableName=\"cptac-slides-prod\""
+parameter_overrides = "VpcId=\"vpc-048ce5ae2f54da08c\" SubnetIds=\"subnet-08ecf506e5200f694,subnet-0326e02bf0573e3fd\" RouteTableIds=\"rtb-0321f778ead0920ff\" FileSystemId=\"fs-137f1a6b\" SecurityGroupId=\"sg-00b45d492fbf21c53\" AccessPointId=\"fsap-0e55010ae11280b0a\" AccessPointArn=\"arn:aws:elasticfilesystem:us-east-2:839559484193:access-point/fsap-0e55010ae11280b0a\" EnvType=\"prod\" ImagesPath=\"/mnt/lambda\" TableName=\"cptac-slides-prod\""

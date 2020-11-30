@@ -21,8 +21,8 @@ Metadata:
       - Label:
           default: Logic template parameters
         Parameters:
-        - StageName
         - ImagesPath
+        - DataSyncTaskArn
       - Label:
           default: Auth template parameters
         Parameters:
@@ -37,10 +37,10 @@ Metadata:
     ParameterLabels:
       EnvType:
         default: Environment type
-      StageName:
-        default: Stage name
       ImagesPath:
         default: Images path
+      DataSyncTaskArn:
+        default: DataSync task ARN
       SupportsConfig:
         default: Use AWS Config
       AvailabilityZones:
@@ -70,10 +70,6 @@ Metadata:
 Parameters:
   EnvType:
     Description: Runtime environment type.
-    Default: dev
-    Type: String
-  StageName:
-    Description: Deployment stage name.
     Default: dev
     Type: String
   ImagesPath:
@@ -200,8 +196,8 @@ Resources:
         AccessPointId: !GetAtt [EfsTemplate, Outputs.AccessPointId]
         AccessPointArn: !GetAtt [EfsTemplate, Outputs.AccessPointArn]
         EnvType: !Ref EnvType
-        StageName: !Ref StageName
         ImagesPath: !Ref ImagesPath
+        DataSyncTaskArn: !Ref DataSyncTaskArn
         TableName: !GetAtt [DbTemplate, Outputs.TableName]
   AuthTemplate:
     Type: AWS::CloudFormation::Stack
@@ -228,7 +224,6 @@ Resources:
       TimeoutInMinutes: 20
       Parameters:
         ApiDomain: [LogicTemplate, Outputs.ApiDomain]
-        StageName: !Ref StageName
         DomainName: DomainName
         UserPoolArn: [AuthTemplate, Outputs.UserPoolArn]
         UserPoolClientId: [AuthTemplate, Outputs.UserPoolClientId]

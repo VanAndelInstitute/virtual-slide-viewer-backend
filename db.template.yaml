@@ -1,16 +1,12 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'DynamoDB Table resources for Virtual Slide Viewer'
 Parameters:
-  EnvType:
-    Description: Runtime environment type.
-    Default: dev
+  VpcId:
     Type: String
-  VPC:
-    Type: String
-    Description: 'ID of your existing Virtual Private Cloud (VPC)'
+    Description: 'VPC ID to use for DynamoDB gateway endpoint'
   RouteTableId:
     Type: String
-    Description: 'The ID of the created main route table of the VPC'
+    Description: 'Route Table ID to use for DynamoDB gateway endpoint'
 Resources:
   SlideTable:
     Type: AWS::DynamoDB::Table
@@ -81,11 +77,11 @@ Resources:
       VpcEndpointType: Gateway
       RouteTableIds:
         - !Ref RouteTableId
-      VpcId: !Ref VPC
+      VpcId: !Ref VpcId
   GraphQLApi:
     Type: AWS::AppSync::GraphQLApi
     Properties: 
-      Name: !Sub 'vsv-metadata-${EnvType}'
+      Name: !Ref AWS::StackName
       AuthenticationType: API_KEY
   GraphQLApiKey:
     Type: AWS::AppSync::ApiKey
@@ -159,25 +155,8 @@ Resources:
     Properties: 
       ApiId: !GetAtt GraphQLApi.ApiId
       Definition: |-
-          input CreateSlideInput {
-            CaseID: String
-            ImageID: String!
-            SlideID: String
-            ScanDate: AWSDateTime
-            AppMag: String
-            MPP: Float
-            height: Int
-            width: Int
-          }
-
-          input DeleteSlideInput {
-            ImageID: String!
-          }
-
           type Mutation {
             updateSlide(input: UpdateSlideInput!): Slide
-            deleteSlide(input: DeleteSlideInput!): Slide
-            deleteSlides(ImageIDs: [String!]): [Slide]
           }
 
           type Query {
@@ -213,13 +192,6 @@ Resources:
               ScanDate: AWSDateTime
             ): Slide
               @aws_subscribe(mutations: ["updateSlide"])
-            onDeleteSlide(
-              CaseID: String,
-              ImageID: String,
-              SlideID: String,
-              ScanDate: AWSDateTime
-            ): Slide
-              @aws_subscribe(mutations: ["deleteSlide"])
           }
 
           input TableBooleanFilterInput {
@@ -495,51 +467,6 @@ Resources:
           }
         }
       ResponseMappingTemplate: '$util.toJson($context.result)'
-      TypeName: Mutation
-  deleteSlideResolver:
-    Type: AWS::AppSync::Resolver
-    Properties: 
-      ApiId: !GetAtt GraphQLApi.ApiId
-      DataSourceName: !GetAtt GraphQLDataSource.Name
-      FieldName: deleteSlide
-      Kind: UNIT
-      RequestMappingTemplate: |-
-        {
-          "version": "2017-02-28",
-          "operation": "DeleteItem",
-          "key": {
-            "ImageID": $util.dynamodb.toDynamoDBJson($ctx.args.input.ImageID),
-          },
-        }
-      ResponseMappingTemplate: '$util.toJson($context.result)'
-      TypeName: Mutation
-  deleteSlidesResolver:
-    Type: AWS::AppSync::Resolver
-    Properties: 
-      ApiId: !GetAtt GraphQLApi.ApiId
-      DataSourceName: !GetAtt GraphQLDataSource.Name
-      FieldName: deleteSlides
-      Kind: UNIT
-      RequestMappingTemplate: !Sub |-
-        #set($ids = [])
-        #foreach($id in $ctx.args.ImageIDs)
-            #set($map = {})
-            $util.qr($map.put("ImageID", $util.dynamodb.toString($id)))
-            $util.qr($ids.add($map))
-        #end
-
-        {
-            "version" : "2018-05-29",
-            "operation" : "BatchDeleteItem",
-            "tables" : {
-                "${SlideTable}": $util.toJson($ids)
-            }
-        }
-      ResponseMappingTemplate: !Sub |-
-        #if ($ctx.error)
-            $util.error($ctx.error.message, $ctx.error.type, null, $ctx.result.data.unprocessedKeys)
-        #end
-        $util.toJson($ctx.result.data.${SlideTable})
       TypeName: Mutation
 
 Outputs:
