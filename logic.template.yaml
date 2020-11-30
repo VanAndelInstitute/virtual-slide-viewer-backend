@@ -176,6 +176,33 @@ Resources:
             RestApiId: !Ref ImagesApi
             Path: /CheckFileTransferStatus
             Method: PUT
+  DeleteSlideFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: vsv
+      Handler: deleteslide.lambda_handler
+      Runtime: python3.8
+      Timeout: 300
+      Policies:
+        - EFSWriteAccessPolicy:
+            FileSystem: !Ref FileSystem
+            AccessPoint: !Ref AccessPointId
+        - DynamoDBReadPolicy:
+            TableName: !Ref TableName
+      VpcConfig:
+        SecurityGroupIds:
+          - Ref: SecurityGroup
+        SubnetIds: !Ref Subnets
+      FileSystemConfigs:
+          - Arn: !Ref AccessPointArn
+            LocalMountPath: !Ref ImagesPath
+      Events:
+        ImagesApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ImagesApi
+            Path: /slide/{imageId}
+            Method: DELETE
   OpenSlide:
     Type: AWS::Serverless::LayerVersion
     Properties:
