@@ -1,6 +1,6 @@
 # Backend for Virtual Slide Viewer
 The VSV backend is implemented as an AWS Serverless application. It mounts an EFS share with SVS files into a Lambda function and handles API Gateway requests
-for DeepZoom tiles by using [OpenSeadragon](https://openseadragon.github.io/) to fetch TIFF tiles and [Pillow-SIMD](https://github.com/uploadcare/pillow-simd) to shrink tiles as needed.
+for DeepZoom tiles by using [OpenSlide Python](https://openslide.org/api/python/) to fetch TIFF tiles and [Pillow-SIMD](https://github.com/uploadcare/pillow-simd) to shrink tiles as needed.
 
 ## Build and deploy
 The infrastructure code is currently a [SAM template](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-getting-started.html). You'll need to [install Docker to build](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-using-build.html) the OpenSlide and libdmtx Lambda layers.
