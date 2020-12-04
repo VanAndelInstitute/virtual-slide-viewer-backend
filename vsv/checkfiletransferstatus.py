@@ -37,9 +37,12 @@ def respond(success, error=None, status=200):
 def lambda_handler(event, context):
     try:
         body = json.loads(event['body'])
-        input_files = set(file['filename'] for file in body['files'])
+        files = body['files']
+        if not isinstance(files, list):
+            files = [files]
+        input_files = set(file['filename'] for file in files)
         found_files = set()
-        for file in body['files']:
+        for file in files:
             filename = file['filename']
             result = slide_table.query(IndexName='Filename-index', KeyConditionExpression=Key('Filename').eq(filename))
             if result['Count'] > 0:
@@ -63,4 +66,5 @@ def lambda_handler(event, context):
         return respond(list(found_files))
         
     except Exception as e:
+        logger.error(e)
         return respond(None, e, 400)
