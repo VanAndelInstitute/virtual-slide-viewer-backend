@@ -25,6 +25,8 @@ Parameters:
     Type: String
   OIDCIssuerURL:
     Type: String
+  DomainName:
+    Type: String
 
 Resources:
   UserPool:
@@ -75,14 +77,13 @@ Resources:
       AllowedOAuthFlows:
         - code
       SupportedIdentityProviders:
-        - COGNITO
         - !Ref UserPoolIdentityProvider
       CallbackURLs:
         # The following sentinel value will be replaced by Auth@Edge with the CloudFront domain name (if you let Auth@Edge create the CloudFront distribution)
-        - https://example.com/will-be-replaced
+        - !Sub https://${DomainName}/parseauth
       LogoutURLs:
         # The following sentinel value will be replaced by Auth@Edge with the CloudFront domain name (if you let Auth@Edge create the CloudFront distribution)
-        - https://example.com/will-be-replaced
+        - !Sub https://${DomainName}/
   UserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
     Properties:
