@@ -149,6 +149,7 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
+          TASK_ARN: !Ref DataSyncTaskArn
       Policies:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref FileSystem
@@ -175,7 +176,7 @@ Resources:
           Properties:
             RestApiId: !Ref ImagesApi
             Path: /CheckFileTransferStatus
-            Method: PUT
+            Method: POST
   DeleteSlideFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -234,7 +235,6 @@ Resources:
       BinaryMediaTypes: ['image/*']
       EndpointConfiguration:
         Type: REGIONAL
-
 Outputs:
   ApiId:
     Description: Api id of ImagesApi
