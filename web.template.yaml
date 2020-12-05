@@ -140,7 +140,7 @@ Resources:
                 - Accept
             TargetOriginId: API
             ViewerProtocolPolicy: redirect-to-https
-          - PathPattern: /CheckFileTransferStatus
+          - PathPattern: /CheckFileTransfer
             TargetOriginId: API
             ViewerProtocolPolicy: redirect-to-https
             AllowedMethods: [GET,HEAD,OPTIONS,PUT,POST,PATCH,DELETE]

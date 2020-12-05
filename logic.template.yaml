@@ -42,7 +42,7 @@ Globals:
         ENV_TYPE: !Ref EnvType
 
 Resources:
-  ImageRequestFunction:
+  ImageRequest:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: vsv
@@ -71,7 +71,7 @@ Resources:
             RestApiId: !Ref ImagesApi
             Path: /DeepZoom/{imagePath+}
             Method: GET
-  ProcessFileFunction:
+  ProcessFileAsync:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: vsv
@@ -99,14 +99,14 @@ Resources:
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
             LocalMountPath: !Ref ImagesPath
-  ProcessFileFunctionVersion:
+  ProcessFileAsyncVersion:
     Type: AWS::Lambda::Version
     Properties: 
-      FunctionName: !Ref ProcessFileFunction
-  FindNewFilesFunction:
+      FunctionName: !Ref ProcessFileAsync
+  FindNewFiles:
     Type: AWS::Serverless::Function
     DependsOn:
-      - ProcessFileFunction
+      - ProcessFileAsync
     Properties:
       CodeUri: vsv
       Handler: findnewfiles.lambda_handler
@@ -115,13 +115,13 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          FILE_FUNCTION_NAME: !Ref ProcessFileFunctionVersion
+          ASYNC_FUNCTION_NAME: !Ref ProcessFileAsyncVersion
       Policies:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref FileSystem
             AccessPoint: !Ref AccessPointId
         - LambdaInvokePolicy:
-            FunctionName: !Ref ProcessFileFunction
+            FunctionName: !Ref ProcessFileAsync
       VpcConfig:
         SecurityGroupIds:
           - Ref: SecurityGroup
@@ -138,11 +138,11 @@ Resources:
               detail-type: [DataSync Task Execution State Change]
               detail:
                 State: [SUCCESS]
-  CheckFileTransferStatusFunction:
+  CheckFileTransfer:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: vsv
-      Handler: checkfiletransferstatus.lambda_handler
+      Handler: checkfiletransfer.lambda_handler
       Runtime: python3.8
       Timeout: 300
       MemorySize: 256
@@ -175,21 +175,49 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref ImagesApi
-            Path: /CheckFileTransferStatus
+            Path: /CheckFileTransfer
             Method: POST
-  DeleteSlideFunction:
+  DeleteCacheAsync:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: vsv
+      Handler: deletecacheasync.lambda_handler
+      Runtime: python3.8
+      Timeout: 450
+      Policies:
+        - EFSWriteAccessPolicy:
+            FileSystem: !Ref FileSystem
+            AccessPoint: !Ref AccessPointId
+      VpcConfig:
+        SecurityGroupIds:
+          - Ref: SecurityGroup
+        SubnetIds: !Ref Subnets
+      FileSystemConfigs:
+          - Arn: !Ref AccessPointArn
+            LocalMountPath: !Ref ImagesPath
+  DeleteCacheAsyncVersion:
+    Type: AWS::Lambda::Version
+    Properties: 
+      FunctionName: !Ref DeleteCacheAsync
+  DeleteSlide:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: vsv
       Handler: deleteslide.lambda_handler
       Runtime: python3.8
-      Timeout: 300
+      Timeout: 15
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+          ASYNC_FUNCTION_NAME: !Ref DeleteCacheAsyncVersion
       Policies:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref FileSystem
             AccessPoint: !Ref AccessPointId
         - DynamoDBReadPolicy:
             TableName: !Ref TableName
+        - LambdaInvokePolicy:
+            FunctionName: !Ref DeleteCacheAsync
       VpcConfig:
         SecurityGroupIds:
           - Ref: SecurityGroup

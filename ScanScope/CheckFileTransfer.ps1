@@ -1,5 +1,5 @@
 ﻿[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$uri = "https://path-uat.cptac.vai.org/CheckFileTransferStatus"
+$uri = "https://path-uat.cptac.vai.org/CheckFileTransfer"
 cd D:\Images\CPTAC
 $list = ls *.svs | ForEach-Object {@{"filename" = $_.Name; "size" = $_.Length}}
 If($list.Count -eq 0)

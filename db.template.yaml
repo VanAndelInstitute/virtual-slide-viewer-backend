@@ -66,10 +66,11 @@ Resources:
           - Effect: Allow
             Principal: '*'
             Action:
-              - 'dynamodb:PutItem'
-              - 'dynamodb:UpdateItem'
               - 'dynamodb:BatchWriteItem'
+              - 'dynamodb:GetItem'
+              - 'dynamodb:PutItem'
               - 'dynamodb:Query'
+              - 'dynamodb:UpdateItem'
             Resource:
               - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${SlideTable}'
               - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${SlideTable}/index/*'
