@@ -18,9 +18,9 @@ Parameters:
     Type: String
     Description: Semantic version of the back end
     Default: 2.0.3
-  ApiId:
+  ApiDomain:
     Type: String
-    Description: The ID of the API Gateway deployment
+    Description: The FQDN of the API Gateway deployment
   HttpHeaders:
     Type: String
     Description: The HTTP headers to set on all responses from CloudFront. Defaults are illustrations only and contain a report-only Cloud Security Policy -- adjust for your application
@@ -36,9 +36,9 @@ Parameters:
   DomainName:
     Type: String
     Description: Custom FQDN of CloudFront distribution
-  UserPoolId:
+  UserPoolArn:
     Type: String
-    Description: The ID of the Cognito user pool
+    Description: The ARN of the Cognito user pool
   UserPoolClientId:
     Type: String
   PriceClass:
@@ -54,9 +54,11 @@ Resources:
       BucketName: !If [HasBucketName, !Ref BucketName, !Sub 'vsv-frontend-${EnvType}']
   CloudFrontOriginAccessIdentity:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    DependsOn:
+      - ApplicationBucket
     Properties:
       CloudFrontOriginAccessIdentityConfig:
-        Comment: !Sub '${BucketName}-OAI'
+        Comment: !Ref ApplicationBucket
   S3AccessPolicyForOAI:
     Type: AWS::S3::BucketPolicy
     Properties: 
@@ -81,7 +83,7 @@ Resources:
         HttpHeaders:
           !Ref HttpHeaders
         AlternateDomainNames: !Ref DomainName
-        UserPoolArn: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${ASW::AccountId}:userpool/${UserPoolId}'
+        UserPoolArn: !Ref UserPoolArn
         UserPoolClientId: !Ref UserPoolClientId
         EnableSPAMode: true
         CreateCloudFrontDistribution: false
@@ -166,8 +168,9 @@ Resources:
             Id: dummy-origin
             CustomOriginConfig:
               OriginProtocolPolicy: match-viewer
-          - DomainName: !Sub ${ApiId}.execute-api.${AWS::Region}.${AWS::URLSuffix}
+          - DomainName: !Ref ApiDomain
             Id: API
+            OriginPath: /dev
             CustomOriginConfig:
               OriginProtocolPolicy: https-only
               OriginSSLProtocols:
@@ -185,7 +188,7 @@ Resources:
 Outputs:
   BucketName:
     Description: Name of the created bucket for front-end resources
-    Value: ApplicationBucket
+    Value: !Ref ApplicationBucket
   CloudFrontDistId:
     Description: ID of the CloudFront distribution that serves your SPA from S3
     Value: !Ref CloudFrontDistribution

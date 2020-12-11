@@ -195,12 +195,12 @@ Resources:
   #       UserPoolArn: !GetAtt [AuthTemplate, Outputs.UserPoolArn]
   #       UserPoolClientId: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]
 Outputs:
-  ApiId:
+  ApiDomain:
     Description: FQDN of ImagesApi
-    Value: !GetAtt [LogicTemplate, Outputs.ApiId]
+    Value: !GetAtt [LogicTemplate, Outputs.ApiDomain]
   UserPoolArn:
     Description: The ARN of the created user pool
-    Value: !GetAtt [AuthTemplate, Outputs.UserPoolId]
+    Value: !GetAtt [AuthTemplate, Outputs.UserPoolArn]
   UserPoolClientId:
     Description: The ID of the created user pool client
     Value: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]
