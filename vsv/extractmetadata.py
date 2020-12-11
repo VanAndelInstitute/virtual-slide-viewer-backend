@@ -1,7 +1,6 @@
 import os
 import json
 import openslide
-import traceback as tb
 from pylibdmtx import pylibdmtx
 from datetime import datetime
 import logging
@@ -17,23 +16,6 @@ PROPERTY_NAME_APERIO_MPP = u'aperio.MPP'
 PROPERTY_NAME_APERIO_APPMAG = u'aperio.AppMag'
 
 IMAGES_PATH = os.environ.get('IMAGES_PATH', '/tmp')
-
-
-def respond(success, error=None, status=200):
- 
-    response = {
-        'isBase64Encoded': False,
-        'statusCode': status,
-        'headers': {
-            'Content-Type' : 'application/json'
-        },
-        'body': ''.join(tb.format_exception(type(error), error, error.__traceback__)) if error else json.dumps(success)
-    }
-
-    log_msg = {x: response[x] if not type(response[x]) is bytes else response[x].decode('ascii') for x in response}
-    logger.debug(json.dumps(log_msg))
-
-    return response
 
 def lambda_handler(event, context):
     image_filename = event['filename']
@@ -81,4 +63,4 @@ def lambda_handler(event, context):
         'lastModified': datetime.utcnow().isoformat(),
     }
 
-    return respond(metadata)
+    return metadata

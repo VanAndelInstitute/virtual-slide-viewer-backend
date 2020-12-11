@@ -41,49 +41,47 @@ def respond(success, error=None, status=200):
     return response
 
 def lambda_handler(event, context):
-
-    body = json.loads(event['body'])
-    file = body['file']
-
+    body = event['body']
     # query for metadata
-    filename = file['filename']
+    filename = body['filename']
     result = slide_table.query(IndexName='Filename-index', KeyConditionExpression=Key('Filename').eq(filename))
     if result['Count'] > 0:
         # Case 1: File metadata has already been processed.
         # Non-empty return value indicates that the local file can now be deleted.
-        return respond(file)
+        return respond(body)
 
     # check for file (runs within VPC b/c of EFS)
     response = lambda_client.invoke(
         FunctionName=CHECK_FILE_FUNCTION,
         LogType='None',
-        Payload=file
+        Payload=json.dumps(body)
     )
-    if response['StatusCode'] == 404:
-        # Case 2: File was not found in EFS
-        # Start DataSync task (if not already running).
-        datasync_client.start_task_execution(TaskArn=TASK_ARN)
-    elif response['StatusCode'] == 202:
-        # Case 3: File was found in EFS, but transfer is not finished yet.
-        # Nothing to do but wait until next invocation.
-        pass
-    elif response['StatusCode'] == 200:
-        # Case 4: File transfer to EFS is complete, but metadata not yet uploaded.
-        # extract,upload file metadata
-        response = lambda_client.invoke(
-            FunctionName=METADATA_FUNCTION,
-            InvocationType='Event', # run async b/c of APIG timeout
-            LogType='None',
-            Payload=f'{{ "filename": "{filename}" }}'
-        )
-        if response['StatusCode'] != 202:
-            logger.error(response['FunctionError']) 
-            return respond(None, FunctionError(response['FunctionError']), response['StatusCode'])
-        logger.info(f'Processing new file "{filename}"')
+    if response['StatusCode'] == 200:
+        result = json.loads(response['Payload'].read())
+        if result == 'Done':
+            # Case 4: File transfer to EFS is complete, but metadata not yet uploaded.
+            # extract,upload file metadata
+            response = lambda_client.invoke(
+                FunctionName=METADATA_FUNCTION,
+                InvocationType='Event', # run async b/c of APIG timeout
+                LogType='None',
+                Payload=f'{{ "filename": "{filename}" }}'
+            )
+            if response['StatusCode'] != 202:
+                logger.error(response['FunctionError'])
+                return respond(None, FunctionError(response['FunctionError']), response['StatusCode'])
+            logger.info(f'Processing new file "{filename}"')
+        elif result == 'NotSynced':
+            # Cases 2 and 3: File was not found in EFS or File was found in EFS, but transfer is not finished yet.
+            # Start DataSync task if not already running.
+            task_description = datasync_client.describe_task(TaskArn=TASK_ARN)	
+            if task_description['Status'] == 'AVAILABLE':
+                datasync_client.start_task_execution(TaskArn=TASK_ARN)
+        else:
+            return respond(json.loads(result), status=400)
     else:
         # Some unexpected error.
         logger.error(response['FunctionError'])
         return respond(None, FunctionError(response['FunctionError']), response['StatusCode'])
-    result = json.loads(response['Payload'])
 
     return respond({})

@@ -1,10 +1,7 @@
 import os
 import json
 import boto3
-import openslide
 import traceback as tb
-from pylibdmtx import pylibdmtx
-from datetime import datetime
 import logging
 logging.basicConfig(level=logging.INFO) 
 logger = logging.getLogger(__name__)
@@ -49,7 +46,8 @@ def lambda_handler(event, context):
         LogType='None',
         Payload=f'{{ "filename": "{filename}" }}'
     )
-    metadata = json.loads(response['Payload'])
+    payload = response['Payload'].read()
+    metadata = json.loads(payload)
 
     # DynamoDB - put metadata
     slide_table.put_item(Item=metadata)

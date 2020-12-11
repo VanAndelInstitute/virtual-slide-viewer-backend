@@ -21,10 +21,6 @@ Parameters:
     Type: String
     Description: Runtime environment type.
     Default: prod
-  ImagesPath:
-    Type: String
-    Description: File system path to image files.
-    Default: '/mnt/lambda'
   TableName:
     Type: String
     Description: Slide table for image metadata.
@@ -51,7 +47,7 @@ Resources:
       MemorySize: 640
       Environment:
         Variables:
-          IMAGES_PATH: !Ref ImagesPath
+          IMAGES_PATH: !Sub '/mnt/${FileSystem}'
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
@@ -65,7 +61,7 @@ Resources:
         SubnetIds: !Ref Subnets
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
-            LocalMountPath: !Ref ImagesPath
+            LocalMountPath: !Sub '/mnt/${FileSystem}'
       Events:
         ImagesApi:
           Type: Api
@@ -83,9 +79,10 @@ Resources:
       MemorySize: 1536
       Environment:
         Variables:
-          IMAGES_PATH: !Ref ImagesPath
+          IMAGES_PATH: !Sub '/mnt/${FileSystem}'
       Layers:
         - !Ref OpenSlide
+        - !Ref PillowSIMD
         - !Ref libdmtx
       Policies:
         - EFSWriteAccessPolicy:
@@ -97,7 +94,7 @@ Resources:
         SubnetIds: !Ref Subnets
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
-            LocalMountPath: !Ref ImagesPath
+            LocalMountPath: !Sub '/mnt/${FileSystem}'
   ExtractMetadataVersion:
     Type: AWS::Lambda::Version
     Properties: 
@@ -135,7 +132,7 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          IMAGES_PATH: !Ref ImagesPath
+          IMAGES_PATH: !Sub '/mnt/${FileSystem}'
       Policies:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref FileSystem
@@ -146,7 +143,7 @@ Resources:
         SubnetIds: !Ref Subnets
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
-            LocalMountPath: !Ref ImagesPath
+            LocalMountPath: !Sub '/mnt/${FileSystem}'
   CheckFileTransferVersion:
     Type: AWS::Lambda::Version
     Properties: 
@@ -196,6 +193,9 @@ Resources:
       Handler: deletecacheasync.lambda_handler
       Runtime: python3.8
       Timeout: 450
+      Environment:
+        Variables:
+          IMAGES_PATH: !Sub '/mnt/${FileSystem}'
       Policies:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref FileSystem
@@ -206,7 +206,7 @@ Resources:
         SubnetIds: !Ref Subnets
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
-            LocalMountPath: !Ref ImagesPath
+            LocalMountPath: !Sub '/mnt/${FileSystem}'
   DeleteCacheAsyncVersion:
     Type: AWS::Lambda::Version
     Properties: 
@@ -222,6 +222,7 @@ Resources:
         Variables:
           TABLE_NAME: !Ref TableName
           ASYNC_FUNCTION_NAME: !Ref DeleteCacheAsyncVersion
+          IMAGES_PATH: !Sub '/mnt/${FileSystem}'
       Policies:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref FileSystem
@@ -236,7 +237,7 @@ Resources:
         SubnetIds: !Ref Subnets
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
-            LocalMountPath: !Ref ImagesPath
+            LocalMountPath: !Sub '/mnt/${FileSystem}'
       Events:
         ImagesApi:
           Type: Api

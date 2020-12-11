@@ -16,7 +16,6 @@ Metadata:
       - Label:
           default: Logic template parameters
         Parameters:
-        - ImagesPath
         - DataSyncTaskId
       - Label:
           default: Auth template parameters
@@ -32,8 +31,6 @@ Metadata:
     ParameterLabels:
       EnvType:
         default: Environment type
-      ImagesPath:
-        default: Images path
       DataSyncTaskId:
         default: ID of the DataSync task ARN
       SupportsConfig:
@@ -69,10 +66,6 @@ Parameters:
   DataSyncTaskId:
     Type: String
     Description: DataSync Task ID for image transfers
-  ImagesPath:
-    Description: File system path to image files.
-    Default: '/mnt/lambda'
-    Type: String
   SupportsConfig:
     Description: Is AWS Config Rules already configured for this region? Use ''false''
       if you are uncertain. See AWS Config Management Console or Deployment Guide
@@ -172,7 +165,6 @@ Resources:
         AccessPointId: !GetAtt [EfsTemplate, Outputs.AccessPointId]
         AccessPointArn: !GetAtt [EfsTemplate, Outputs.AccessPointArn]
         EnvType: !Ref EnvType
-        #ImagesPath: !Ref ImagesPath
         TableName: !GetAtt [DbTemplate, Outputs.TableName]
         DataSyncTaskId: !Ref DataSyncTaskId
   AuthTemplate:
