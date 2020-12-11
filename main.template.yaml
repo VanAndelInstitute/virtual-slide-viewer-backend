@@ -5,14 +5,9 @@ Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
-          default: Deployment bucket parameters
-        Parameters:
-        - TemplateBucket
-        - TemplateKey
-      - Label:
           default: General parameters
         Parameters:
-        - Environment
+        - EnvType
         - SupportsConfig
       - Label:
           default: VPC template parameters
@@ -22,56 +17,58 @@ Metadata:
           default: Logic template parameters
         Parameters:
         - ImagesPath
-        - DataSyncTaskArn
+        - DataSyncTaskId
       - Label:
           default: Auth template parameters
         Parameters:
         - FromEmailAddress
-        - SesIdentityArn
+        - FromEmailName
         - OAuthScopes
         - AuthDomainPrefix
       - Label:
           default: Web template parameters
         Parameters:
-        - WebBucketName
+        - DomainName
     ParameterLabels:
       EnvType:
         default: Environment type
       ImagesPath:
         default: Images path
-      DataSyncTaskArn:
-        default: DataSync task ARN
+      DataSyncTaskId:
+        default: ID of the DataSync task ARN
       SupportsConfig:
         default: Use AWS Config
       AvailabilityZones:
         default: Availability zones
-      TemplateBucket:
-        default: Deployment S3 bucket name
-      TemplateKey:
-        default: Prefix for deployment template S3 objects
       FromEmailAddress:
         default: For Cognito Email configuration
-      SesIdentityArn:
+      FromEmailName:
         default: For Cognito Email configuration
       OAuthScopes:
         default: The OAuth scopes to request the User Pool to add to the access token JWT
       AuthDomainPrefix:
         default: A custom prefix to use for the sign-up and sign-in pages that are hosted by Amazon Cognito
-      OIDCProviderName:
-        default: A name for the OIDC provider configuration
-      OIDCClientId:
-        default: Client ID from OIDC provider
-      OIDCClientSecret:
-        default: Client secret from OIDC provider
-      OIDCIssuerURL:
-        default: Issuer URL from OIDC provider
-      WebBucketName:
-        default: Name of an S3 bucket to create to deploy the web app
+      DomainName:
+        default: Custom FQDN of CloudFront distribution
+      # OIDCProviderName:
+      #   default: A name for the OIDC provider configuration
+      # OIDCClientId:
+      #   default: Client ID from OIDC provider
+      # OIDCClientSecret:
+      #   default: Client secret from OIDC provider
+      # OIDCIssuerURL:
+      #   default: Issuer URL from OIDC provider
 Parameters:
   EnvType:
     Description: Runtime environment type.
     Default: dev
     Type: String
+  DomainName:
+    Type: String
+    Description: Custom FQDN of CloudFront distribution
+  DataSyncTaskId:
+    Type: String
+    Description: DataSync Task ID for image transfers
   ImagesPath:
     Description: File system path to image files.
     Default: '/mnt/lambda'
@@ -89,18 +86,11 @@ Parameters:
     Description: Availability Zones
     Type: CommaDelimitedList
     Default: us-east-2a, us-east-2b
-  TemplateBucket:
-    Type: String
-    Description: Deployment S3 bucket name
-    Default: aws-sam-cli-managed-default-samclisourcebucket-3okyxt2msf06
-  TemplateKey:
-    Type: String
-    Description: Prefix for deployment template S3 objects
-    Default: vsv-templates
   FromEmailAddress:
     Type: String
-  SesIdentityArn:
+  FromEmailName:
     Type: String
+    Default: 'Virtual Slide Viewer'
   OAuthScopes:
     Type: CommaDelimitedList
     Description: The OAuth scopes to request the User Pool to add to the access token JWT
@@ -136,12 +126,11 @@ Conditions:
     - 'true'
 Resources:
   VpcTemplate:
-    Type: AWS::CloudFormation::Stack
+    Type: AWS::Serverless::Application
     Properties:
-      TemplateURL:
-        !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/vpc.template'
-      TimeoutInMinutes: 20
+      Location: vpc.template.yaml
       Parameters:
+        EnvType: !Ref EnvType
         RegionAZ1Name:
           !Select
           - 0
@@ -150,45 +139,32 @@ Resources:
           !Select
           - 1
           - !Ref AvailabilityZones
-        CIDR: 10.100.0.0/16
-        SubnetACIDR: 10.100.10.0/24
-        SubnetBCIDR: 10.100.20.0/24
-        VPCName: VSV
+        #CIDR: 10.100.0.0/16
+        #SubnetACIDR: 10.100.10.0/24
+        #SubnetBCIDR: 10.100.20.0/24
   EfsTemplate:
-    Type: AWS::CloudFormation::Stack
+    Type: AWS::Serverless::Application
     DependsOn:
       - VpcTemplate
     Properties:
-      TemplateURL:
-        !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/efs.template'
-      TimeoutInMinutes: 20
+      Location: efs.template.yaml
       Parameters:
+        EnvType: !Ref EnvType
         VPC: !GetAtt [VpcTemplate, Outputs.VpcId]
         SecurityGroup: !GetAtt [VpcTemplate, Outputs.SecurityGroupId]
         Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
-        EnvType: !Ref EnvType
   DbTemplate:
-    Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - VpcTemplate
+    Type: AWS::Serverless::Application
     Properties:
-      TemplateURL:
-        !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/db.template'
-      TimeoutInMinutes: 20
-      Parameters:
-        EnvType: !Ref EnvType
-        VPC: !GetAtt [VpcTemplate, Outputs.VpcId]
-        RouteTableId:  !GetAtt [VpcTemplate, Outputs.RouteTableId]
+      Location: db.template.yaml
   LogicTemplate:
-    Type: AWS::CloudFormation::Stack
+    Type: AWS::Serverless::Application
     DependsOn:
       - VpcTemplate
       - EfsTemplate
       - DbTemplate
     Properties:
-      TemplateURL:
-        !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/logic.template'
-      TimeoutInMinutes: 20
+      Location: template.yaml
       Parameters:
         Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
         FileSystem: !GetAtt [EfsTemplate, Outputs.FileSystemId]
@@ -196,34 +172,43 @@ Resources:
         AccessPointId: !GetAtt [EfsTemplate, Outputs.AccessPointId]
         AccessPointArn: !GetAtt [EfsTemplate, Outputs.AccessPointArn]
         EnvType: !Ref EnvType
-        ImagesPath: !Ref ImagesPath
-        DataSyncTaskArn: !Ref DataSyncTaskArn
+        #ImagesPath: !Ref ImagesPath
         TableName: !GetAtt [DbTemplate, Outputs.TableName]
+        DataSyncTaskId: !Ref DataSyncTaskId
   AuthTemplate:
-    Type: AWS::CloudFormation::Stack
+    Type: AWS::Serverless::Application
     Properties:
-      TemplateURL:
-        !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/auth.template'
-      TimeoutInMinutes: 20
+      Location: auth.template.yaml
       Parameters:
-        AuthDomainPrefix: cptac-uat
-        FromEmailAddress: 'CPTAC <cptac@vai.org>'
-        OIDCClientId: '4214de37-0cd1-4238-86ce-04ca11e2161b'
-        OIDCClientSecret: 'optH~3r3c4cr~aS1-.YA8o.3HOoU_1mzQB'
-        OIDCIssuerURL: 'https://login.microsoftonline.com/5aad1a34-d695-43ac-9334-777b4e10019b/v2.0'
-        OIDCProviderName: VAI
-        SesIdentityArn: 'arn:aws:ses:us-east-1:839559484193:identity/cptac@vai.org'
-  WebTemplate:
-    Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - LogicTemplate
-      - AuthTemplate
-    Properties:
-      TemplateURL:
-        !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.${AWS::URLSuffix}/${TemplateKey}/web.template'
-      TimeoutInMinutes: 20
-      Parameters:
-        ApiDomain: [LogicTemplate, Outputs.ApiDomain]
-        DomainName: DomainName
-        UserPoolArn: [AuthTemplate, Outputs.UserPoolArn]
-        UserPoolClientId: [AuthTemplate, Outputs.UserPoolClientId]
+        AuthDomainPrefix: !Ref AuthDomainPrefix
+        DomainName: !Ref DomainName
+        FromEmailAddress: !Ref FromEmailAddress
+        FromEmailName: !Ref FromEmailName
+        #OAuthScopes: !Ref OAuthScopes
+        # OIDCClientId: !Ref OIDCClientId
+        # OIDCClientSecret: !Ref OIDCClientSecret
+        # OIDCIssuerURL: !Ref OIDCIssuerURL
+        # OIDCProviderName: !Ref OIDCProviderName
+  # WebTemplate:
+  #   Type: AWS::Serverless::Application
+  #   DependsOn:
+  #     - LogicTemplate
+  #     - AuthTemplate
+  #   Properties:
+  #     Location: web.template.yaml
+  #     Parameters:
+  #       EnvType: !Ref EnvType
+  #       ApiDomain: !GetAtt [LogicTemplate, Outputs.ApiDomain]
+  #       DomainName: !Ref DomainName
+  #       UserPoolArn: !GetAtt [AuthTemplate, Outputs.UserPoolArn]
+  #       UserPoolClientId: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]
+Outputs:
+  ApiId:
+    Description: FQDN of ImagesApi
+    Value: !GetAtt [LogicTemplate, Outputs.ApiId]
+  UserPoolArn:
+    Description: The ARN of the created user pool
+    Value: !GetAtt [AuthTemplate, Outputs.UserPoolId]
+  UserPoolClientId:
+    Description: The ID of the created user pool client
+    Value: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]

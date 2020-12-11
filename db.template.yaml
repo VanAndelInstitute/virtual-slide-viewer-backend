@@ -1,12 +1,10 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'DynamoDB Table resources for Virtual Slide Viewer'
 Parameters:
-  VpcId:
+  EnvType:
+    Description: Runtime environment type.
+    Default: dev
     Type: String
-    Description: 'VPC ID to use for DynamoDB gateway endpoint'
-  RouteTableId:
-    Type: String
-    Description: 'Route Table ID to use for DynamoDB gateway endpoint'
 Resources:
   SlideTable:
     Type: AWS::DynamoDB::Table
@@ -55,30 +53,6 @@ Resources:
       KeySchema: 
         - AttributeName: ImageID
           KeyType: HASH
-  DynamoDbEndpoint:
-    Type: AWS::EC2::VPCEndpoint
-    DependsOn:
-      - SlideTable
-    Properties:
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal: '*'
-            Action:
-              - 'dynamodb:BatchWriteItem'
-              - 'dynamodb:GetItem'
-              - 'dynamodb:PutItem'
-              - 'dynamodb:Query'
-              - 'dynamodb:UpdateItem'
-            Resource:
-              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${SlideTable}'
-              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${SlideTable}/index/*'
-      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
-      VpcEndpointType: Gateway
-      RouteTableIds:
-        - !Ref RouteTableId
-      VpcId: !Ref VpcId
   GraphQLApi:
     Type: AWS::AppSync::GraphQLApi
     Properties: 
@@ -93,7 +67,7 @@ Resources:
   GraphQLDataSourceRole:
     Type: AWS::IAM::Role
     Properties: 
-      RoleName: !Sub appsync-ds-ddb
+      RoleName: !Sub appsync-ds-ddb-${EnvType}
       AssumeRolePolicyDocument: |-
         {
           "Version": "2012-10-17",
@@ -110,7 +84,7 @@ Resources:
       Description: Allows the AWS AppSync service to access your data source.
       Path: '/service-role/'
       Policies: 
-        - PolicyName: !Sub appsync-ds-ddb
+        - PolicyName: !Sub appsync-ds-ddb-${EnvType}
           PolicyDocument: !Sub |-
             {
                 "Version": "2012-10-17",

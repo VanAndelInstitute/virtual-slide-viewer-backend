@@ -7,7 +7,9 @@ The infrastructure code is currently a [SAM template](https://docs.aws.amazon.co
 
 ```
 $ sam build -u -t logic.template.yaml
-$ sam deploy
+$ sam package --s3-bucket $DEPLOYBUCKET --s3-prefix $S3PREFIX --output-template-file  template.yaml
+$ sam deploy -t main.template.yaml
+$ sam deploy -t web.template.yaml
 ```
 
 

@@ -18,9 +18,9 @@ Parameters:
     Type: String
     Description: Semantic version of the back end
     Default: 2.0.3
-  ApiDomain:
+  ApiId:
     Type: String
-    Description: The URL of the API Gateway deployment
+    Description: The ID of the API Gateway deployment
   HttpHeaders:
     Type: String
     Description: The HTTP headers to set on all responses from CloudFront. Defaults are illustrations only and contain a report-only Cloud Security Policy -- adjust for your application
@@ -35,8 +35,10 @@ Parameters:
       }
   DomainName:
     Type: String
-  UserPoolArn:
+    Description: Custom FQDN of CloudFront distribution
+  UserPoolId:
     Type: String
+    Description: The ID of the Cognito user pool
   UserPoolClientId:
     Type: String
   PriceClass:
@@ -61,14 +63,14 @@ Resources:
       Bucket:
         Ref: ApplicationBucket
       PolicyDocument:
-        Version: "2012-10-17"
+        Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
               CanonicalUser:
                 Fn::GetAtt: [ CloudFrontOriginAccessIdentity , S3CanonicalUserId ]
-            Action: "s3:GetObject"
-            Resource: !Sub "${ApplicationBucket.Arn}/*"
+            Action: 's3:GetObject'
+            Resource: !Sub '${ApplicationBucket.Arn}/*'
   LambdaEdgeProtection:
     Type: AWS::Serverless::Application
     Properties:
@@ -79,7 +81,7 @@ Resources:
         HttpHeaders:
           !Ref HttpHeaders
         AlternateDomainNames: !Ref DomainName
-        UserPoolArn: !Ref UserPoolArn
+        UserPoolArn: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${ASW::AccountId}:userpool/${UserPoolId}'
         UserPoolClientId: !Ref UserPoolClientId
         EnableSPAMode: true
         CreateCloudFrontDistribution: false
@@ -140,7 +142,10 @@ Resources:
                 - Accept
             TargetOriginId: API
             ViewerProtocolPolicy: redirect-to-https
-          - PathPattern: /CheckFileTransfer
+          - PathPattern: /IngestSlide
+            Compress: true
+            ForwardedValues:
+              QueryString: true
             TargetOriginId: API
             ViewerProtocolPolicy: redirect-to-https
             AllowedMethods: [GET,HEAD,OPTIONS,PUT,POST,PATCH,DELETE]
@@ -161,16 +166,16 @@ Resources:
             Id: dummy-origin
             CustomOriginConfig:
               OriginProtocolPolicy: match-viewer
-          - DomainName: !Ref ApiDomain
+          - DomainName: !Sub ${ApiId}.execute-api.${AWS::Region}.${AWS::URLSuffix}
             Id: API
             CustomOriginConfig:
               OriginProtocolPolicy: https-only
               OriginSSLProtocols:
                 - TLSv1.2
-          - DomainName: !Sub "${ApplicationBucket}.s3.amazonaws.com"
+          - DomainName: !Sub '${ApplicationBucket}.s3.amazonaws.com'
             Id: protected-origin
             S3OriginConfig:
-              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
+              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}'
         CustomErrorResponses:
             - ErrorCode: 404
               ResponseCode: 200

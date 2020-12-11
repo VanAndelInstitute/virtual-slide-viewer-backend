@@ -15,18 +15,15 @@ Metadata:
       - CIDR
       - SubnetACIDR
       - SubnetBCIDR
-      - VPCName
     ParameterLabels:
-      ProductionVPCName:
-        default: Name of VPC
-      ProductionCIDR:
+      CIDR:
         default: VPC CIDR block
-      DMZSubnetACIDR:
+      SubnetACIDR:
         default: CIDR block of A subnet
-      DMZSubnetBCIDR:
+      SubnetBCIDR:
         default: CIDR block of B subnet
 Parameters:
-  Environment:
+  EnvType:
     Description: Runtime environment type.
     Default: dev
     Type: String
@@ -38,10 +35,6 @@ Parameters:
   RegionAZ2Name:
     Description: Availability Zone 2 Name in Region
     Type: String
-  VPCName:
-    Description: VPC Name
-    Type: String
-    Default: VSV
   CIDR:
     Description: CIDR block for  VPC
     Type: String
@@ -54,9 +47,6 @@ Parameters:
     Description: CIDR block for AZ-1b subnet
     Type: String
     Default: 10.100.20.0/24
-  TableName:
-    Description: Slide table for image metadata.
-    Type: String
 Resources:
   VPC:
     Type: AWS::EC2::VPC
@@ -67,16 +57,35 @@ Resources:
       EnableDnsHostnames: true
       Tags:
       - Key: Name
-        Value: !Ref VPCName
-      - Key: Environment
-        Value: !Ref Environment
-  RouteTableMain:
+        Value: !Sub '${AWS::StackName}'
+      - Key: EnvType
+        Value: !Ref EnvType
+  RouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
       Tags:
       - Key: Name
-        Value: !Ref VPCName
+        Value: !Ref VPC
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: !Sub '${AWS::StackName}'
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: 
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+  InternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn:
+      - VPCGatewayAttachment
+    Properties:
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTable
   SubnetA:
     Type: AWS::EC2::Subnet
     Properties:
@@ -86,8 +95,8 @@ Resources:
       Tags:
       - Key: Name
         Value: Subnet A
-      - Key: Environment
-        Value: !Ref Environment
+      - Key: EnvType
+        Value: !Ref EnvType
   SubnetB:
     Type: AWS::EC2::Subnet
     Properties:
@@ -97,17 +106,17 @@ Resources:
       Tags:
       - Key: Name
         Value: Subnet B
-      - Key: Environment
-        Value: !Ref Environment
-  RouteAssocMainA:
+      - Key: EnvType
+        Value: !Ref EnvType
+  RouteAssocA:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref RouteTableMain
+      RouteTableId: !Ref RouteTable
       SubnetId: !Ref SubnetA
-  RouteAssocMainB:
+  RouteAssocB:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref RouteTableMain
+      RouteTableId: !Ref RouteTable
       SubnetId: !Ref SubnetB
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -124,26 +133,6 @@ Resources:
           FromPort: 0
           ToPort: 65535
           IpProtocol: tcp
-  LambdaEndpoint:
-    Type: AWS::EC2::VPCEndpoint
-    Properties:
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal: '*'
-            Action: 'lambda:InvokeFunction'
-            Resource:
-              - !Sub 'arn:aws:lambda:us-east-2:839559484193:function:*'
-      PrivateDnsEnabled: True
-      SecurityGroupIds:
-        - !Ref SecurityGroup
-      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.lambda'
-      SubnetIds: 
-        - !Ref SubnetA
-        - !Ref SubnetB
-      VpcEndpointType: Interface
-      VpcId: !Ref VPC
 
 Outputs:
   VpcId:
@@ -153,8 +142,8 @@ Outputs:
     Description: 'The list of created subnet IDs, for at least two Availability Zones in the region in your Virtual Private Cloud (VPC)'
     Value: !Join [',', [!Ref SubnetA, !Ref SubnetB]]
   RouteTableId:
-    Description: 'The ID of the created main route table of the VPC'
-    Value: !Ref RouteTableMain
+    Description: 'The ID of the created route table of the VPC'
+    Value: !Ref RouteTable
   SecurityGroupId:
     Description: 'The ID of the created security group'
     Value: !Ref SecurityGroup

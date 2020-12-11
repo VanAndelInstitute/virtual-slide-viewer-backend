@@ -28,7 +28,7 @@ Parameters:
   TableName:
     Type: String
     Description: Slide table for image metadata.
-  DataSyncTaskArn:
+  DataSyncTaskId:
     Type: String
     Description: DataSync Task ID for image transfers
 
@@ -38,7 +38,6 @@ Globals:
   Function:
     Environment:
       Variables:
-        IMAGES_PATH: !Ref ImagesPath
         ENV_TYPE: !Ref EnvType
 
 Resources:
@@ -50,6 +49,9 @@ Resources:
       Runtime: python3.8
       Timeout: 15
       MemorySize: 640
+      Environment:
+        Variables:
+          IMAGES_PATH: !Ref ImagesPath
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
@@ -71,27 +73,24 @@ Resources:
             RestApiId: !Ref ImagesApi
             Path: /DeepZoom/{imagePath+}
             Method: GET
-  ProcessFileAsync:
+  ExtractMetadata:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: vsv
-      Handler: processfile.lambda_handler
+      Handler: extractmetadata.lambda_handler
       Runtime: python3.8
-      Timeout: 450
+      Timeout: 120
       MemorySize: 1536
       Environment:
         Variables:
-          TABLE_NAME: !Ref TableName
+          IMAGES_PATH: !Ref ImagesPath
       Layers:
         - !Ref OpenSlide
-        - !Ref PillowSIMD
         - !Ref libdmtx
       Policies:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref FileSystem
             AccessPoint: !Ref AccessPointId
-        - DynamoDBWritePolicy:
-            TableName: !Ref TableName
       VpcConfig:
         SecurityGroupIds:
           - Ref: SecurityGroup
@@ -99,61 +98,81 @@ Resources:
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
             LocalMountPath: !Ref ImagesPath
-  ProcessFileAsyncVersion:
+  ExtractMetadataVersion:
     Type: AWS::Lambda::Version
     Properties: 
-      FunctionName: !Ref ProcessFileAsync
-  FindNewFiles:
+      FunctionName: !Ref ExtractMetadata
+  UploadMetadata:
     Type: AWS::Serverless::Function
     DependsOn:
-      - ProcessFileAsync
+      - ExtractMetadataVersion
     Properties:
       CodeUri: vsv
-      Handler: findnewfiles.lambda_handler
+      Handler: uploadmetadata.lambda_handler
       Runtime: python3.8
-      Timeout: 30
+      Timeout: 150
       MemorySize: 128
       Environment:
         Variables:
-          ASYNC_FUNCTION_NAME: !Ref ProcessFileAsyncVersion
+          METADATA_FUNCTION: !Ref ExtractMetadataVersion
+          TABLE_NAME: !Ref TableName
       Policies:
-        - EFSWriteAccessPolicy:
-            FileSystem: !Ref FileSystem
-            AccessPoint: !Ref AccessPointId
         - LambdaInvokePolicy:
-            FunctionName: !Ref ProcessFileAsync
-      VpcConfig:
-        SecurityGroupIds:
-          - Ref: SecurityGroup
-        SubnetIds: !Ref Subnets
-      FileSystemConfigs:
-          - Arn: !Ref AccessPointArn
-            LocalMountPath: !Ref ImagesPath
-      Events:
-        DataSyncSuccess:
-          Type: EventBridgeRule
-          Properties:
-            Pattern:
-              source: [aws.datasync]
-              detail-type: [DataSync Task Execution State Change]
-              detail:
-                State: [SUCCESS]
+            FunctionName: !Ref ExtractMetadata
+        - DynamoDBWritePolicy:
+            TableName: !Ref TableName
+  UploadMetadataVersion:
+    Type: AWS::Lambda::Version
+    Properties: 
+      FunctionName: !Ref UploadMetadata
   CheckFileTransfer:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: vsv
       Handler: checkfiletransfer.lambda_handler
       Runtime: python3.8
-      Timeout: 300
-      MemorySize: 256
+      Timeout: 3
+      MemorySize: 128
       Environment:
         Variables:
-          TABLE_NAME: !Ref TableName
-          TASK_ARN: !Ref DataSyncTaskArn
+          IMAGES_PATH: !Ref ImagesPath
       Policies:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref FileSystem
             AccessPoint: !Ref AccessPointId
+      VpcConfig:
+        SecurityGroupIds:
+          - Ref: SecurityGroup
+        SubnetIds: !Ref Subnets
+      FileSystemConfigs:
+          - Arn: !Ref AccessPointArn
+            LocalMountPath: !Ref ImagesPath
+  CheckFileTransferVersion:
+    Type: AWS::Lambda::Version
+    Properties: 
+      FunctionName: !Ref CheckFileTransfer
+  IngestSlide:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - CheckFileTransferVersion
+      - UploadMetadataVersion
+    Properties:
+      CodeUri: vsv
+      Handler: ingestslide.lambda_handler
+      Runtime: python3.8
+      Timeout: 29
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+          CHECK_FILE_FUNCTION: !Ref CheckFileTransferVersion
+          METADATA_FUNCTION: !Ref UploadMetadataVersion
+          TASK_ARN: !Sub 'arn:aws:datasync:${AWS::Region}:${AWS::AccountId}:task/${DataSyncTaskId}'
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref UploadMetadata
+        - LambdaInvokePolicy:
+            FunctionName: !Ref CheckFileTransfer
         - DynamoDBReadPolicy:
             TableName: !Ref TableName
         - Version: '2012-10-17'
@@ -162,20 +181,13 @@ Resources:
               Action:
                 - datasync:DescribeTask
                 - datasync:StartTaskExecution
-              Resource: !Ref DataSyncTaskArn
-      VpcConfig:
-        SecurityGroupIds:
-          - Ref: SecurityGroup
-        SubnetIds: !Ref Subnets
-      FileSystemConfigs:
-          - Arn: !Ref AccessPointArn
-            LocalMountPath: !Ref ImagesPath
+              Resource: !Sub 'arn:aws:datasync:${AWS::Region}:${AWS::AccountId}:task/${DataSyncTaskId}'
       Events:
         ImagesApi:
           Type: Api
           Properties:
             RestApiId: !Ref ImagesApi
-            Path: /CheckFileTransfer
+            Path: /IngestSlide
             Method: POST
   DeleteCacheAsync:
     Type: AWS::Serverless::Function
