@@ -172,13 +172,16 @@ Resources:
             FunctionName: !Ref CheckFileTransfer
         - DynamoDBReadPolicy:
             TableName: !Ref TableName
-        - Version: '2012-10-17'
-          Statement:
+        - Statement:
             - Effect: Allow
               Action:
                 - datasync:DescribeTask
                 - datasync:StartTaskExecution
               Resource: !Sub 'arn:aws:datasync:${AWS::Region}:${AWS::AccountId}:task/${DataSyncTaskId}'
+        - Statement:
+            - Effect: Allow
+              Action: ec2:DescribeNetworkInterfaces
+              Resource: '*'
       Events:
         ImagesApi:
           Type: Api
