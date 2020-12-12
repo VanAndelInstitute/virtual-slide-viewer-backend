@@ -144,7 +144,7 @@ Resources:
                 - Accept
             TargetOriginId: API
             ViewerProtocolPolicy: redirect-to-https
-          - PathPattern: /IngestSlide
+          - PathPattern: /ImportSlide
             Compress: true
             ForwardedValues:
               QueryString: true

@@ -148,14 +148,14 @@ Resources:
     Type: AWS::Lambda::Version
     Properties: 
       FunctionName: !Ref CheckFileTransfer
-  IngestSlide:
+  ImportSlide:
     Type: AWS::Serverless::Function
     DependsOn:
       - CheckFileTransferVersion
       - UploadMetadataVersion
     Properties:
       CodeUri: vsv
-      Handler: ingestslide.lambda_handler
+      Handler: importslide.lambda_handler
       Runtime: python3.8
       Timeout: 29
       MemorySize: 256
@@ -187,44 +187,18 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref ImagesApi
-            Path: /IngestSlide
+            Path: /ImportSlide
             Method: POST
-  DeleteCacheAsync:
+  DeleteSlideFiles:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: vsv
-      Handler: deletecacheasync.lambda_handler
+      Handler: deleteslidefiles.lambda_handler
       Runtime: python3.8
-      Timeout: 450
-      Environment:
-        Variables:
-          IMAGES_PATH: !Sub '/mnt/${FileSystem}'
-      Policies:
-        - EFSWriteAccessPolicy:
-            FileSystem: !Ref FileSystem
-            AccessPoint: !Ref AccessPointId
-      VpcConfig:
-        SecurityGroupIds:
-          - Ref: SecurityGroup
-        SubnetIds: !Ref Subnets
-      FileSystemConfigs:
-          - Arn: !Ref AccessPointArn
-            LocalMountPath: !Sub '/mnt/${FileSystem}'
-  DeleteCacheAsyncVersion:
-    Type: AWS::Lambda::Version
-    Properties: 
-      FunctionName: !Ref DeleteCacheAsync
-  DeleteSlide:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: vsv
-      Handler: deleteslide.lambda_handler
-      Runtime: python3.8
-      Timeout: 15
+      Timeout: 900
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
-          ASYNC_FUNCTION_NAME: !Ref DeleteCacheAsyncVersion
           IMAGES_PATH: !Sub '/mnt/${FileSystem}'
       Policies:
         - EFSWriteAccessPolicy:
@@ -232,8 +206,6 @@ Resources:
             AccessPoint: !Ref AccessPointId
         - DynamoDBReadPolicy:
             TableName: !Ref TableName
-        - LambdaInvokePolicy:
-            FunctionName: !Ref DeleteCacheAsync
       VpcConfig:
         SecurityGroupIds:
           - Ref: SecurityGroup
@@ -242,12 +214,13 @@ Resources:
           - Arn: !Ref AccessPointArn
             LocalMountPath: !Sub '/mnt/${FileSystem}'
       Events:
-        ImagesApi:
-          Type: Api
+        DeleteSlides:
+          Type: Schedule
           Properties:
-            RestApiId: !Ref ImagesApi
-            Path: /slide/{imageId}
-            Method: DELETE
+            Schedule: 'rate(1 day)'
+            Name: DeleteSlides
+            Description: Delete files on EFS for slides marked as DELETED
+            Enabled: False
   OpenSlide:
     Type: AWS::Serverless::LayerVersion
     Properties:

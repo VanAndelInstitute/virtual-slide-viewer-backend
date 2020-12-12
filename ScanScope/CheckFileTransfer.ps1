@@ -1,14 +1,7 @@
 ﻿[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$uri = "https://path-uat.cptac.vai.org/CheckFileTransfer"
-cd D:\Images\CPTAC
-$list = ls *.svs | ForEach-Object {@{"filename" = $_.Name; "size" = $_.Length}}
-If($list.Count -eq 0)
-{
-    return
-}
-$body = @{"files" = $list} | ConvertTo-Json
-$result = Invoke-RestMethod -Method 'POST' -Uri $uri -Body $body
-ForEach($filename in $result)
-{
+$uri = "https://vpn-test.cptac.vai.org/ImportSlide"
+ls *.svs | ForEach-Object -Parallel {
+    $body = @{"filename" = $_.Name; "size" = $_.Length}
+    $result = Invoke-RestMethod -Method 'POST' -Uri $uri -Body $body
     del $filename
 } 
