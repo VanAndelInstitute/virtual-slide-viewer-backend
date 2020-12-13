@@ -41,7 +41,7 @@ def respond(success, error=None, status=200):
     return response
 
 def lambda_handler(event, context):
-    body = event['body']
+    body = json.loads(event['body'])
     # query for metadata
     filename = body['filename']
     result = slide_table.query(IndexName='Filename-index', KeyConditionExpression=Key('Filename').eq(filename))
@@ -54,7 +54,7 @@ def lambda_handler(event, context):
     response = lambda_client.invoke(
         FunctionName=CHECK_FILE_FUNCTION,
         LogType='None',
-        Payload=json.dumps(body)
+        Payload=event['body']
     )
     if response['StatusCode'] == 200:
         result = json.loads(response['Payload'].read())

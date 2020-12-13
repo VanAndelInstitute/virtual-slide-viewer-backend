@@ -1,7 +1,7 @@
-﻿[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$uri = "https://vpn-test.cptac.vai.org/ImportSlide"
+﻿param($Hostname)
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 ls *.svs | ForEach-Object -Parallel {
-    $body = @{"filename" = $_.Name; "size" = $_.Length}
-    $result = Invoke-RestMethod -Method 'POST' -Uri $uri -Body $body
-    del $filename
+    $body = ConvertTo-Json @{"filename" = $_.Name; "size" = $_.Length}
+    $result = Invoke-RestMethod -Method 'POST' -Uri "https://${using:Hostname}/ImportSlide" -Body $body
+    del $result.filename
 } 
