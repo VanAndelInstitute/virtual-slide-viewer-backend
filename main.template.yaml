@@ -150,7 +150,7 @@ Resources:
     Type: AWS::Serverless::Application
     Properties:
       Location: db.template.yaml
-  LogicTemplate:
+  FuncTemplate:
     Type: AWS::Serverless::Application
     DependsOn:
       - VpcTemplate
@@ -184,20 +184,20 @@ Resources:
   # WebTemplate:
   #   Type: AWS::Serverless::Application
   #   DependsOn:
-  #     - LogicTemplate
+  #     - FuncTemplate
   #     - AuthTemplate
   #   Properties:
   #     Location: web.template.yaml
   #     Parameters:
   #       EnvType: !Ref EnvType
-  #       ApiDomain: !GetAtt [LogicTemplate, Outputs.ApiDomain]
+  #       ApiDomain: !GetAtt [FuncTemplate, Outputs.ApiDomain]
   #       DomainName: !Ref DomainName
   #       UserPoolArn: !GetAtt [AuthTemplate, Outputs.UserPoolArn]
   #       UserPoolClientId: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]
 Outputs:
   ApiDomain:
     Description: FQDN of ImagesApi
-    Value: !GetAtt [LogicTemplate, Outputs.ApiDomain]
+    Value: !GetAtt [FuncTemplate, Outputs.ApiDomain]
   UserPoolArn:
     Description: The ARN of the created user pool
     Value: !GetAtt [AuthTemplate, Outputs.UserPoolArn]

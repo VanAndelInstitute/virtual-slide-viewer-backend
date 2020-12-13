@@ -5,13 +5,19 @@ for DeepZoom tiles by using [OpenSlide Python](https://openslide.org/api/python/
 ## Build and deploy
 The infrastructure code is currently a [SAM template](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-getting-started.html). You'll need to [install Docker to build](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-using-build.html) the OpenSlide and libdmtx Lambda layers.
 
+### Build and package function resources
 ```
-$ sam build -u -t logic.template.yaml
+$ sam build -u -t func.template.yaml
 $ sam package --s3-bucket $DEPLOYBUCKET --s3-prefix $S3PREFIX --output-template-file  template.yaml
+```
+### Deploy all infrastructure except CloudFront (in any region)
+```
 $ sam deploy -t main.template.yaml
+```
+### Deploy CloudFront infrastructure (in us-east-1 region only)
+```
 $ sam deploy -t web.template.yaml
 ```
-
 
 ## General workflow for Virtual Slide Viewer deployments
 1. Aperio scanner dumps SVS images onto local ScanScope workstation storage
