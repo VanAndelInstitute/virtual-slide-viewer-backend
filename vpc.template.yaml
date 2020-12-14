@@ -27,8 +27,6 @@ Parameters:
     Description: Runtime environment type.
     Default: dev
     Type: String
-    AllowedValues: [prod, dev, test]
-    ConstraintDescription: must specify prod, dev, or test.
   RegionAZ1Name:
     Description: Availability Zone 1 Name in Region
     Type: String

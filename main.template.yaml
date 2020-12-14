@@ -91,14 +91,16 @@ Parameters:
   AuthDomainPrefix:
     Type: String
     Description: A custom prefix to use for the sign-up and sign-in pages that are hosted by Amazon Cognito
-  OIDCProviderName:
-    Type: String
-  OIDCClientId:
-    Type: String
-  OIDCClientSecret:
-    Type: String
-  OIDCIssuerURL:
-    Type: String
+  # OIDCProviderName:
+  #   Type: String
+  # OIDCClientId:
+  #   Type: String
+  #   Default: dummy
+  # OIDCClientSecret:
+  #   Type: String
+  #   Default: dummy
+  # OIDCIssuerURL:
+  #   Type: String
   HttpHeaders:
     Type: String
     Description: The HTTP headers to set on all responses from CloudFront. Defaults are illustrations only and contain a report-only Cloud Security Policy -- adjust for your application
@@ -159,6 +161,8 @@ Resources:
     Properties:
       Location: template.yaml
       Parameters:
+        VpcId: !GetAtt [VpcTemplate, Outputs.VpcId]
+        RouteTableId: !GetAtt [VpcTemplate, Outputs.RouteTableId]
         Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
         FileSystem: !GetAtt [EfsTemplate, Outputs.FileSystemId]
         SecurityGroup: !GetAtt [VpcTemplate, Outputs.SecurityGroupId]

@@ -2,6 +2,12 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: 'Lambda and API Gateway resources for Virtual Slide Viewer'
 Parameters:
+  VpcId:
+    Type: String
+    Description: 'VPC ID to use for DynamoDB gateway endpoint'
+  RouteTableId:
+    Type: String
+    Description: 'Route Table ID to use for DynamoDB gateway endpoint'
   Subnets:
     Type: CommaDelimitedList
     Description: 'The list of Subnet IDs, for at least two Availability Zones in the region in your Virtual Private Cloud (VPC)'
@@ -69,17 +75,18 @@ Resources:
             RestApiId: !Ref ImagesApi
             Path: /DeepZoom/{imagePath+}
             Method: GET
-  ExtractMetadata:
+  ImportMetadata:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: vsv
-      Handler: extractmetadata.lambda_handler
+      Handler: importmetadata.lambda_handler
       Runtime: python3.8
       Timeout: 120
       MemorySize: 1536
       Environment:
         Variables:
           IMAGES_PATH: !Sub '/mnt/${FileSystem}'
+          TABLE_NAME: !Ref TableName
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
@@ -88,6 +95,8 @@ Resources:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref FileSystem
             AccessPoint: !Ref AccessPointId
+        - DynamoDBWritePolicy:
+            TableName: !Ref TableName
       VpcConfig:
         SecurityGroupIds:
           - Ref: SecurityGroup
@@ -95,33 +104,10 @@ Resources:
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
             LocalMountPath: !Sub '/mnt/${FileSystem}'
-  ExtractMetadataVersion:
+  ImportMetadataVersion:
     Type: AWS::Lambda::Version
     Properties: 
-      FunctionName: !Ref ExtractMetadata
-  UploadMetadata:
-    Type: AWS::Serverless::Function
-    DependsOn:
-      - ExtractMetadataVersion
-    Properties:
-      CodeUri: vsv
-      Handler: uploadmetadata.lambda_handler
-      Runtime: python3.8
-      Timeout: 150
-      MemorySize: 128
-      Environment:
-        Variables:
-          METADATA_FUNCTION: !Ref ExtractMetadataVersion
-          TABLE_NAME: !Ref TableName
-      Policies:
-        - LambdaInvokePolicy:
-            FunctionName: !Ref ExtractMetadata
-        - DynamoDBWritePolicy:
-            TableName: !Ref TableName
-  UploadMetadataVersion:
-    Type: AWS::Lambda::Version
-    Properties: 
-      FunctionName: !Ref UploadMetadata
+      FunctionName: !Ref ImporttMetadata
   CheckFileTransfer:
     Type: AWS::Serverless::Function
     Properties:
@@ -152,7 +138,7 @@ Resources:
     Type: AWS::Serverless::Function
     DependsOn:
       - CheckFileTransferVersion
-      - UploadMetadataVersion
+      - ImportMetadataVersion
     Properties:
       CodeUri: vsv
       Handler: importslide.lambda_handler
@@ -163,11 +149,11 @@ Resources:
         Variables:
           TABLE_NAME: !Ref TableName
           CHECK_FILE_FUNCTION: !Ref CheckFileTransferVersion
-          METADATA_FUNCTION: !Ref UploadMetadataVersion
+          METADATA_FUNCTION: !Ref ImportMetadataVersion
           TASK_ARN: !Sub 'arn:aws:datasync:${AWS::Region}:${AWS::AccountId}:task/${DataSyncTaskId}'
       Policies:
         - LambdaInvokePolicy:
-            FunctionName: !Ref UploadMetadata
+            FunctionName: !Ref ImportMetadata
         - LambdaInvokePolicy:
             FunctionName: !Ref CheckFileTransfer
         - DynamoDBReadPolicy:
@@ -221,6 +207,25 @@ Resources:
             Name: DeleteSlides
             Description: Delete files on EFS for slides marked as DELETED
             Enabled: False
+  DynamoDbEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action:
+              - 'dynamodb:PutItem'
+              - 'dynamodb:Query'
+            Resource:
+              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}'
+              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}/index/*'
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref RouteTableId
+      VpcId: !Ref VpcId
   OpenSlide:
     Type: AWS::Serverless::LayerVersion
     Properties:

@@ -1,5 +1,6 @@
 import os
 import json
+import boto3
 import openslide
 from pylibdmtx import pylibdmtx
 from datetime import datetime
@@ -16,6 +17,10 @@ PROPERTY_NAME_APERIO_MPP = u'aperio.MPP'
 PROPERTY_NAME_APERIO_APPMAG = u'aperio.AppMag'
 
 IMAGES_PATH = os.environ.get('IMAGES_PATH', '/tmp')
+TABLE_NAME = os.environ.get('TABLE_NAME')
+
+dynamodb = boto3.resource('dynamodb')
+slide_table = dynamodb.Table(TABLE_NAME)
 
 def lambda_handler(event, context):
     image_filename = event['filename']
@@ -63,4 +68,6 @@ def lambda_handler(event, context):
         'lastModified': datetime.utcnow().isoformat(),
     }
 
-    return metadata
+    # DynamoDB - put metadata
+    slide_table.put_item(Item=metadata)
+    logger.info(f'Uploaded metadata for {image_filename}')
