@@ -1,0 +1,210 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Top level deployment template for Virtual Slide Viewer'
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: General parameters
+        Parameters:
+        - EnvType
+        - SupportsConfig
+      - Label:
+          default: VPC template parameters
+        Parameters:
+        - AvailabilityZones
+      - Label:
+          default: Logic template parameters
+        Parameters:
+        - DataSyncTaskId
+      - Label:
+          default: Auth template parameters
+        Parameters:
+        - FromEmailAddress
+        - FromEmailName
+        - OAuthScopes
+        - AuthDomainPrefix
+      - Label:
+          default: Web template parameters
+        Parameters:
+        - DomainName
+    ParameterLabels:
+      EnvType:
+        default: Environment type
+      DataSyncTaskId:
+        default: ID of the DataSync task ARN
+      SupportsConfig:
+        default: Use AWS Config
+      AvailabilityZones:
+        default: Availability zones
+      FromEmailAddress:
+        default: For Cognito Email configuration
+      FromEmailName:
+        default: For Cognito Email configuration
+      OAuthScopes:
+        default: The OAuth scopes to request the User Pool to add to the access token JWT
+      AuthDomainPrefix:
+        default: A custom prefix to use for the sign-up and sign-in pages that are hosted by Amazon Cognito
+      DomainName:
+        default: Custom FQDN of CloudFront distribution
+      # OIDCProviderName:
+      #   default: A name for the OIDC provider configuration
+      # OIDCClientId:
+      #   default: Client ID from OIDC provider
+      # OIDCClientSecret:
+      #   default: Client secret from OIDC provider
+      # OIDCIssuerURL:
+      #   default: Issuer URL from OIDC provider
+Parameters:
+  EnvType:
+    Description: Runtime environment type.
+    Default: dev
+    Type: String
+  DomainName:
+    Type: String
+    Description: Custom FQDN of CloudFront distribution
+  DataSyncTaskId:
+    Type: String
+    Description: DataSync Task ID for image transfers
+  SupportsConfig:
+    Description: Is AWS Config Rules already configured for this region? Use ''false''
+      if you are uncertain. See AWS Config Management Console or Deployment Guide
+      for details.
+    AllowedValues:
+    - 'true'
+    - 'false'
+    Default: 'false'
+    Type: String
+  AvailabilityZones:
+    Description: Availability Zones
+    Type: CommaDelimitedList
+    Default: us-east-2a, us-east-2b
+  FromEmailAddress:
+    Type: String
+  FromEmailName:
+    Type: String
+    Default: 'Virtual Slide Viewer'
+  OAuthScopes:
+    Type: CommaDelimitedList
+    Description: The OAuth scopes to request the User Pool to add to the access token JWT
+    Default: "phone, email, profile, openid, aws.cognito.signin.user.admin"
+  AuthDomainPrefix:
+    Type: String
+    Description: A custom prefix to use for the sign-up and sign-in pages that are hosted by Amazon Cognito
+  # OIDCProviderName:
+  #   Type: String
+  # OIDCClientId:
+  #   Type: String
+  #   Default: dummy
+  # OIDCClientSecret:
+  #   Type: String
+  #   Default: dummy
+  # OIDCIssuerURL:
+  #   Type: String
+  HttpHeaders:
+    Type: String
+    Description: The HTTP headers to set on all responses from CloudFront. Defaults are illustrations only and contain a report-only Cloud Security Policy -- adjust for your application
+    Default: >-
+      {
+        "Content-Security-Policy-Report-Only": "default-src 'none'; img-src 'self' data: https://${ApiId}.execute-api.${AWS::Region}.${AWS::URLSuffix}; script-src 'self'; style-src 'self'; object-src 'none'; connect-src 'self' https://*.amazonaws.com https://*.amazoncognito.com",
+        "Strict-Transport-Security": "max-age=31536000; includeSubdomains; preload",
+        "Referrer-Policy": "same-origin",
+        "X-XSS-Protection": "1; mode=block",
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff"
+      }
+  
+Conditions:
+  LoadConfigRulesTemplate:
+    !Equals
+    - !Ref SupportsConfig
+    - 'true'
+Resources:
+  VpcTemplate:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: vpc.template.yaml
+      Parameters:
+        EnvType: !Ref EnvType
+        RegionAZ1Name:
+          !Select
+          - 0
+          - !Ref AvailabilityZones
+        RegionAZ2Name:
+          !Select
+          - 1
+          - !Ref AvailabilityZones
+        #CIDR: 10.100.0.0/16
+        #SubnetACIDR: 10.100.10.0/24
+        #SubnetBCIDR: 10.100.20.0/24
+  EfsTemplate:
+    Type: AWS::Serverless::Application
+    DependsOn:
+      - VpcTemplate
+    Properties:
+      Location: efs.template.yaml
+      Parameters:
+        EnvType: !Ref EnvType
+        VPC: !GetAtt [VpcTemplate, Outputs.VpcId]
+        SecurityGroup: !GetAtt [VpcTemplate, Outputs.SecurityGroupId]
+        Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
+  DbTemplate:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: db.template.yaml
+  FuncTemplate:
+    Type: AWS::Serverless::Application
+    DependsOn:
+      - VpcTemplate
+      - EfsTemplate
+      - DbTemplate
+    Properties:
+      Location: template.yaml
+      Parameters:
+        VpcId: !GetAtt [VpcTemplate, Outputs.VpcId]
+        RouteTableId: !GetAtt [VpcTemplate, Outputs.RouteTableId]
+        Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
+        FileSystem: !GetAtt [EfsTemplate, Outputs.FileSystemId]
+        SecurityGroup: !GetAtt [VpcTemplate, Outputs.SecurityGroupId]
+        AccessPointId: !GetAtt [EfsTemplate, Outputs.AccessPointId]
+        AccessPointArn: !GetAtt [EfsTemplate, Outputs.AccessPointArn]
+        EnvType: !Ref EnvType
+        TableName: !GetAtt [DbTemplate, Outputs.TableName]
+        DataSyncTaskId: !Ref DataSyncTaskId
+  AuthTemplate:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: auth.template.yaml
+      Parameters:
+        AuthDomainPrefix: !Ref AuthDomainPrefix
+        DomainName: !Ref DomainName
+        FromEmailAddress: !Ref FromEmailAddress
+        FromEmailName: !Ref FromEmailName
+        #OAuthScopes: !Ref OAuthScopes
+        # OIDCClientId: !Ref OIDCClientId
+        # OIDCClientSecret: !Ref OIDCClientSecret
+        # OIDCIssuerURL: !Ref OIDCIssuerURL
+        # OIDCProviderName: !Ref OIDCProviderName
+  # WebTemplate:
+  #   Type: AWS::Serverless::Application
+  #   DependsOn:
+  #     - FuncTemplate
+  #     - AuthTemplate
+  #   Properties:
+  #     Location: web.template.yaml
+  #     Parameters:
+  #       EnvType: !Ref EnvType
+  #       ApiDomain: !GetAtt [FuncTemplate, Outputs.ApiDomain]
+  #       DomainName: !Ref DomainName
+  #       UserPoolArn: !GetAtt [AuthTemplate, Outputs.UserPoolArn]
+  #       UserPoolClientId: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]
+Outputs:
+  ApiDomain:
+    Description: FQDN of ImagesApi
+    Value: !GetAtt [FuncTemplate, Outputs.ApiDomain]
+  UserPoolArn:
+    Description: The ARN of the created user pool
+    Value: !GetAtt [AuthTemplate, Outputs.UserPoolArn]
+  UserPoolClientId:
+    Description: The ID of the created user pool client
+    Value: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]

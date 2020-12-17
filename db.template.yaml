@@ -1,0 +1,460 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'DynamoDB Table resources for Virtual Slide Viewer'
+Parameters:
+  EnvType:
+    Description: Runtime environment type.
+    Default: dev
+    Type: String
+Resources:
+  SlideTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    Properties:
+      AttributeDefinitions: 
+        - AttributeName: ImageID
+          AttributeType: S
+        - AttributeName: CaseID
+          AttributeType: S
+        - AttributeName: Status
+          AttributeType: S
+        - AttributeName: SlideID
+          AttributeType: S
+        - AttributeName: Filename
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      GlobalSecondaryIndexes: 
+        - IndexName: CaseID-index
+          KeySchema:
+            - AttributeName: CaseID
+              KeyType: HASH
+          Projection:
+            ProjectionType: KEYS_ONLY
+        - IndexName: Filename-index
+          KeySchema:
+            - AttributeName: Filename
+              KeyType: HASH
+          Projection:
+            ProjectionType: KEYS_ONLY
+        - IndexName: Status-SlideID-index
+          KeySchema:
+            - AttributeName: Status
+              KeyType: HASH
+            - AttributeName: SlideID
+              KeyType: RANGE
+          Projection:
+            NonKeyAttributes:
+              - CaseID
+              - AppMag
+              - MPP
+              - ScanDate
+            ProjectionType: INCLUDE
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      KeySchema: 
+        - AttributeName: ImageID
+          KeyType: HASH
+  GraphQLApi:
+    Type: AWS::AppSync::GraphQLApi
+    Properties: 
+      Name: !Ref AWS::StackName
+      AuthenticationType: API_KEY
+  GraphQLApiKey:
+    Type: AWS::AppSync::ApiKey
+    DependsOn:
+      - GraphQLApi
+    Properties: 
+      ApiId: !GetAtt GraphQLApi.ApiId
+  GraphQLDataSourceRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      RoleName: !Sub appsync-ds-ddb-${EnvType}
+      AssumeRolePolicyDocument: |-
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "appsync.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+      Description: Allows the AWS AppSync service to access your data source.
+      Path: '/service-role/'
+      Policies: 
+        - PolicyName: !Sub appsync-ds-ddb-${EnvType}
+          PolicyDocument: !Sub |-
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "dynamodb:BatchGetItem",
+                            "dynamodb:BatchWriteItem",
+                            "dynamodb:PutItem",
+                            "dynamodb:DeleteItem",
+                            "dynamodb:GetItem",
+                            "dynamodb:Scan",
+                            "dynamodb:Query",
+                            "dynamodb:UpdateItem"
+                        ],
+                        "Resource": [
+                            "arn:aws:dynamodb:us-east-2:839559484193:table/${SlideTable}",
+                            "arn:aws:dynamodb:us-east-2:839559484193:table/${SlideTable}/*"
+                        ]
+                    }
+                ]
+            }
+  GraphQLDataSource:
+    Type: AWS::AppSync::DataSource
+    DependsOn:
+      - GraphQLDataSourceRole
+      - GraphQLApi 
+    Properties: 
+      Name: !Join [ '_', !Split ['-', !Ref SlideTable]]
+      Type: AMAZON_DYNAMODB
+      ApiId: !GetAtt GraphQLApi.ApiId
+      DynamoDBConfig: 
+        AwsRegion: !Sub ${AWS::Region}
+        TableName: !Ref SlideTable
+        UseCallerCredentials: false
+        Versioned: false
+      ServiceRoleArn: !GetAtt GraphQLDataSourceRole.Arn
+  GraphQLSchema:
+    Type: AWS::AppSync::GraphQLSchema
+    DependsOn:
+      - GraphQLApi
+    Properties: 
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Definition: |-
+          type Mutation {
+            updateSlide(input: UpdateSlideInput!): Slide
+          }
+
+          type Query {
+            getSlide(ImageID: String!): Slide
+            listSlides(filter: TableSlideFilterInput, limit: Int, nextToken: String): SlideConnection
+            listCaseIDs(nextToken: String): SlideConnection
+            querySlidesByStatus(Status: String!, limit: Int, nextToken: String): SlideConnection
+            getSlides(ImageIDs: [String!]): [Slide]
+          }
+
+          type Slide {
+            CaseID: String
+            ImageID: String!
+            SlideID: String
+            ScanDate: AWSDateTime
+            AppMag: String
+            MPP: Float
+            height: Int
+            width: Int
+            Status: String
+          }
+
+          type SlideConnection {
+            items: [Slide]
+            nextToken: String
+          }
+
+          type Subscription {
+            onUpdateSlide(
+              CaseID: String,
+              ImageID: String,
+              SlideID: String,
+              ScanDate: AWSDateTime
+            ): Slide
+              @aws_subscribe(mutations: ["updateSlide"])
+          }
+
+          input TableBooleanFilterInput {
+            ne: Boolean
+            eq: Boolean
+          }
+
+          input TableFloatFilterInput {
+            ne: Float
+            eq: Float
+            le: Float
+            lt: Float
+            ge: Float
+            gt: Float
+            contains: Float
+            notContains: Float
+            between: [Float]
+          }
+
+          input TableIDFilterInput {
+            ne: ID
+            eq: ID
+            le: ID
+            lt: ID
+            ge: ID
+            gt: ID
+            contains: ID
+            notContains: ID
+            between: [ID]
+            beginsWith: ID
+          }
+
+          input TableIntFilterInput {
+            ne: Int
+            eq: Int
+            le: Int
+            lt: Int
+            ge: Int
+            gt: Int
+            contains: Int
+            notContains: Int
+            between: [Int]
+          }
+
+          input TableSlideFilterInput {
+            CaseID: TableStringFilterInput
+            ImageID: TableStringFilterInput
+            SlideID: TableStringFilterInput
+            ScanDate: TableStringFilterInput
+            AppMag: TableStringFilterInput
+            MPP: TableFloatFilterInput
+          }
+
+          input TableStringFilterInput {
+            ne: String
+            eq: String
+            le: String
+            lt: String
+            ge: String
+            gt: String
+            contains: String
+            notContains: String
+            between: [String]
+            beginsWith: String
+          }
+
+          input UpdateSlideInput {
+            CaseID: String
+            ImageID: String!
+            SlideID: String
+            Status: String
+          }
+  getSlideResolver:
+    Type: AWS::AppSync::Resolver
+    Properties: 
+      ApiId: !GetAtt GraphQLApi.ApiId
+      DataSourceName: !GetAtt GraphQLDataSource.Name
+      FieldName: getSlide
+      Kind: UNIT
+      RequestMappingTemplate: |-
+        {
+          "version": "2017-02-28",
+          "operation": "GetItem",
+          "key": {
+            "ImageID": $util.dynamodb.toDynamoDBJson($ctx.args.ImageID),
+          },
+        }
+      ResponseMappingTemplate: '$util.toJson($context.result)'
+      TypeName: Query
+  getSlidesResolver:
+    Type: AWS::AppSync::Resolver
+    Properties: 
+      ApiId: !GetAtt GraphQLApi.ApiId
+      DataSourceName: !GetAtt GraphQLDataSource.Name
+      FieldName: getSlides
+      Kind: UNIT
+      RequestMappingTemplate: !Sub |-
+        #set($ids = [])
+        #foreach($id in $ctx.args.ImageIDs)
+            #set($map = {})
+            $util.qr($map.put("ImageID", $util.dynamodb.toString($id)))
+            $util.qr($ids.add($map))
+        #end
+
+        {
+            "version" : "2018-05-29",
+            "operation" : "BatchGetItem",
+            "tables" : {
+                "${SlideTable}": {
+                    "keys": $util.toJson($ids),
+                    "consistentRead": true
+                }
+            }
+        }
+      ResponseMappingTemplate: !Sub |-
+        #if($ctx.error)
+            $utils.appendError($ctx.error.message, $ctx.error.message)
+        #end
+        $utils.toJson($ctx.result.data.${SlideTable})
+      TypeName: Query
+  listSlidesResolver:
+    Type: AWS::AppSync::Resolver
+    Properties: 
+      ApiId: !GetAtt GraphQLApi.ApiId
+      DataSourceName: !GetAtt GraphQLDataSource.Name
+      FieldName: listSlides
+      Kind: UNIT
+      RequestMappingTemplate: |-
+        {
+          "version": "2017-02-28",
+          "operation": "Scan",
+          "filter": #if($context.args.filter) $util.transform.toDynamoDBFilterExpression($ctx.args.filter) #else null #end,
+          "limit": $util.defaultIfNull($ctx.args.limit, 20),
+          "nextToken": $util.toJson($util.defaultIfNullOrEmpty($ctx.args.nextToken, null)),
+        }
+      ResponseMappingTemplate: '$util.toJson($context.result)'
+      TypeName: Query
+  listCaseIDsResolver:
+    Type: AWS::AppSync::Resolver
+    Properties: 
+      ApiId: !GetAtt GraphQLApi.ApiId
+      DataSourceName: !GetAtt GraphQLDataSource.Name
+      FieldName: listCaseIDs
+      Kind: UNIT
+      RequestMappingTemplate: |-
+        {
+            "version" : "2017-02-28",
+            "operation" : "Scan",
+            "index": "CaseID-index",
+            "nextToken": $util.toJson($util.defaultIfNullOrBlank($ctx.args.nextToken, null))
+        }
+      ResponseMappingTemplate: '$util.toJson($context.result)'
+      TypeName: Query
+  querySlidesByStatusResolver:
+    Type: AWS::AppSync::Resolver
+    Properties: 
+      ApiId: !GetAtt GraphQLApi.ApiId
+      DataSourceName: !GetAtt GraphQLDataSource.Name
+      FieldName: querySlidesByStatus
+      Kind: UNIT
+      RequestMappingTemplate: |-
+        {
+            "version" : "2017-02-28",
+            "operation" : "Query",
+            "index" : "Status-SlideID-index",
+            "query" : {
+                "expression": "#status = :status",
+                "expressionNames" : {
+                  "#status" : "Status"
+              },
+                "expressionValues" : {
+                    ":status" : $util.dynamodb.toDynamoDBJson($ctx.args.Status)
+                }
+            },
+            "limit": $util.defaultIfNull($ctx.args.limit, 20),
+            "nextToken": $util.toJson($util.defaultIfNullOrEmpty($ctx.args.nextToken, null))
+        }
+      ResponseMappingTemplate: '$util.toJson($context.result)'
+      TypeName: Query
+  updateSlideResolver:
+    Type: AWS::AppSync::Resolver
+    Properties: 
+      ApiId: !GetAtt GraphQLApi.ApiId
+      DataSourceName: !GetAtt GraphQLDataSource.Name
+      FieldName: updateSlide
+      Kind: UNIT
+      RequestMappingTemplate: |-
+        {
+          "version": "2017-02-28",
+          "operation": "UpdateItem",
+          "key": {
+            "ImageID": $util.dynamodb.toDynamoDBJson($ctx.args.input.ImageID),
+          },
+
+          ## Set up some space to keep track of things we're updating **
+          #set( $expNames  = {} )
+          #set( $expValues = {} )
+          #set( $expSet = {} )
+          #set( $expAdd = {} )
+          #set( $expRemove = [] )
+          
+          ## Iterate through each argument, skipping keys **
+          #foreach( $entry in $util.map.copyAndRemoveAllKeys($ctx.args.input, ["ImageID"]).entrySet() )
+            #if( $util.isNull($entry.value) )
+              ## If the argument is set to "null", then remove that attribute from the item in DynamoDB **
+
+              #set( $discard = ${expRemove.add("#${entry.key}")} )
+              $!{expNames.put("#${entry.key}", "${entry.key}")}
+            #else
+              ## Otherwise set (or update) the attribute on the item in DynamoDB **
+
+              $!{expSet.put("#${entry.key}", ":${entry.key}")}
+              $!{expNames.put("#${entry.key}", "${entry.key}")}
+              $!{expValues.put(":${entry.key}", $util.dynamodb.toDynamoDB($entry.value))}
+            #end
+          #end
+          
+          ## Update lastModified
+          $!{expSet.put("lastModified", ":now")}
+          $!{expValues.put(":now", $util.dynamodb.toDynamoDB($util.time.nowISO8601()))}
+
+          ## Start building the update expression, starting with attributes we're going to SET **
+          #set( $expression = "" )
+          #if( !${expSet.isEmpty()} )
+            #set( $expression = "SET" )
+            #foreach( $entry in $expSet.entrySet() )
+              #set( $expression = "${expression} ${entry.key} = ${entry.value}" )
+              #if ( $foreach.hasNext )
+                #set( $expression = "${expression}," )
+              #end
+            #end
+          #end
+
+          ## Continue building the update expression, adding attributes we're going to ADD **
+          #if( !${expAdd.isEmpty()} )
+            #set( $expression = "${expression} ADD" )
+            #foreach( $entry in $expAdd.entrySet() )
+              #set( $expression = "${expression} ${entry.key} ${entry.value}" )
+              #if ( $foreach.hasNext )
+                #set( $expression = "${expression}," )
+              #end
+            #end
+          #end
+
+          ## Continue building the update expression, adding attributes we're going to REMOVE **
+          #if( !${expRemove.isEmpty()} )
+            #set( $expression = "${expression} REMOVE" )
+
+            #foreach( $entry in $expRemove )
+              #set( $expression = "${expression} ${entry}" )
+              #if ( $foreach.hasNext )
+                #set( $expression = "${expression}," )
+              #end
+            #end
+          #end
+
+          ## Finally, write the update expression into the document, along with any expressionNames and expressionValues **
+          "update": {
+            "expression": "${expression}",
+            #if( !${expNames.isEmpty()} )
+              "expressionNames": $utils.toJson($expNames),
+            #end
+            #if( !${expValues.isEmpty()} )
+              "expressionValues": $utils.toJson($expValues),
+            #end
+          },
+
+          "condition": {
+            "expression": "attribute_exists(#ImageID)",
+            "expressionNames": {
+              "#ImageID": "ImageID",
+            },
+          }
+        }
+      ResponseMappingTemplate: '$util.toJson($context.result)'
+      TypeName: Mutation
+
+Outputs:
+  ApiId:
+    Description: ID of your GraphQL API
+    Value: !GetAtt GraphQLApi.ApiId
+  ApiUrl:
+    Description: URL of your GraphQL API endpoint
+    Value: !GetAtt GraphQLApi.GraphQLUrl
+  TableName:
+    Description: Name of the created table
+    Value: !Ref SlideTable
+  ApiKey:
+    Description: API key for GraphQL API
+    Value: !GetAtt GraphQLApiKey.ApiKey

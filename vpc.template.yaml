@@ -1,0 +1,148 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'VPC resources for Virtual Slide Viewer'
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Region Config
+      Parameters:
+      - RegionAZ1Name
+      - RegionAZ2Name
+    - Label:
+        default: VPC Config
+      Parameters:
+      - CIDR
+      - SubnetACIDR
+      - SubnetBCIDR
+    ParameterLabels:
+      CIDR:
+        default: VPC CIDR block
+      SubnetACIDR:
+        default: CIDR block of A subnet
+      SubnetBCIDR:
+        default: CIDR block of B subnet
+Parameters:
+  EnvType:
+    Description: Runtime environment type.
+    Default: dev
+    Type: String
+  RegionAZ1Name:
+    Description: Availability Zone 1 Name in Region
+    Type: String
+  RegionAZ2Name:
+    Description: Availability Zone 2 Name in Region
+    Type: String
+  CIDR:
+    Description: CIDR block for  VPC
+    Type: String
+    Default: 10.100.0.0/16
+  SubnetACIDR:
+    Description: CIDR block for AZ-1b subnet
+    Type: String
+    Default: 10.100.10.0/24
+  SubnetBCIDR:
+    Description: CIDR block for AZ-1b subnet
+    Type: String
+    Default: 10.100.20.0/24
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref CIDR
+      InstanceTenancy: default
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+      - Key: Name
+        Value: !Sub '${AWS::StackName}'
+      - Key: EnvType
+        Value: !Ref EnvType
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: !Ref VPC
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: !Sub '${AWS::StackName}'
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: 
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+  InternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn:
+      - VPCGatewayAttachment
+    Properties:
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTable
+  SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Ref SubnetACIDR
+      AvailabilityZone: !Ref RegionAZ1Name
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: Subnet A
+      - Key: EnvType
+        Value: !Ref EnvType
+  SubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Ref SubnetBCIDR
+      AvailabilityZone: !Ref RegionAZ2Name
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: Subnet B
+      - Key: EnvType
+        Value: !Ref EnvType
+  RouteAssocA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref SubnetA
+  RouteAssocB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref SubnetB
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: VSV Security Group
+      VpcId: !Ref VPC
+      SecurityGroupEgress:
+        - CidrIp: '0.0.0.0/0'
+          FromPort: 0
+          ToPort: 65535
+          IpProtocol: tcp
+      SecurityGroupIngress:
+        - CidrIp: '0.0.0.0/0'
+          FromPort: 0
+          ToPort: 65535
+          IpProtocol: tcp
+
+Outputs:
+  VpcId:
+    Description: 'The ID of the created Virtual Private Cloud (VPC)'
+    Value: !Ref VPC
+  SubnetIds:
+    Description: 'The list of created subnet IDs, for at least two Availability Zones in the region in your Virtual Private Cloud (VPC)'
+    Value: !Join [',', [!Ref SubnetA, !Ref SubnetB]]
+  RouteTableId:
+    Description: 'The ID of the created route table of the VPC'
+    Value: !Ref RouteTable
+  SecurityGroupId:
+    Description: 'The ID of the created security group'
+    Value: !Ref SecurityGroup
+  

@@ -1,0 +1,100 @@
+# Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Cognito resources for Virtual Slide Viewer'
+
+Parameters:
+  FromEmailAddress:
+    Type: String
+  FromEmailName:
+    Type: String
+  OAuthScopes:
+    Type: CommaDelimitedList
+    Description: The OAuth scopes to request the User Pool to add to the access token JWT
+    Default: 'phone, email, profile, openid, aws.cognito.signin.user.admin'
+  AuthDomainPrefix:
+    Type: String
+    Description: A custom prefix to use for the sign-up and sign-in pages that are hosted by Amazon Cognito
+  DomainName:
+    Type: String
+  # OIDCProviderName:
+  #   Type: String
+  # OIDCClientId:
+  #   Type: String
+  # OIDCClientSecret:
+  #   Type: String
+  # OIDCIssuerURL:
+  #   Type: String
+
+Resources:
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Ref AWS::StackName
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      UsernameAttributes:
+        - email
+      UsernameConfiguration:
+        CaseSensitive: false
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      UserPoolAddOns:
+        AdvancedSecurityMode: ENFORCED
+      EmailConfiguration:
+        EmailSendingAccount: DEVELOPER
+        From: !Sub '${FromEmailName} <${FromEmailAddress}>'
+        SourceArn: !Sub 'arn:aws:ses:us-east-1:${AWS::AccountId}:identity/${FromEmailAddress}'
+  # UserPoolIdentityProvider:
+  #   Type: AWS::Cognito::UserPoolIdentityProvider
+  #   Properties:
+  #     UserPoolId: !Ref UserPool
+  #     ProviderName: !Ref OIDCProviderName
+  #     ProviderDetails:
+  #       client_id: !Ref OIDCClientId
+  #       client_secret: !Ref OIDCClientSecret
+  #       attributes_request_method: GET
+  #       oidc_issuer: !Ref OIDCIssuerURL
+  #       authorize_scopes: 'email profile openid'
+  #     ProviderType: OIDC
+  #     AttributeMapping:
+  #       username: sub
+  #       name: name
+  #       preferred_username: preferred_username
+  #       email: email
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      PreventUserExistenceErrors: ENABLED
+      AllowedOAuthScopes: !Ref OAuthScopes
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      SupportedIdentityProviders:
+        - COGNITO
+      #  - !Ref UserPoolIdentityProvider
+      CallbackURLs:
+        # The following sentinel value will be replaced by Auth@Edge with the CloudFront domain name (if you let Auth@Edge create the CloudFront distribution)
+        - !Sub https://${DomainName}/parseauth
+      LogoutURLs:
+        # The following sentinel value will be replaced by Auth@Edge with the CloudFront domain name (if you let Auth@Edge create the CloudFront distribution)
+        - !Sub https://${DomainName}/
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      Domain: !Ref AuthDomainPrefix
+Outputs:
+  UserPoolId:
+    Description: The ARN of the created user pool
+    Value: !Ref UserPool
+  UserPoolArn:
+    Description: The ARN of the created user pool
+    Value: !GetAtt UserPool.Arn
+  UserPoolClientId:
+    Description: The ID of the created user pool client
+    Value: !Ref UserPoolClient
+  
