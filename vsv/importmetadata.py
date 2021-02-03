@@ -3,7 +3,7 @@ import json
 import boto3
 import openslide
 from pylibdmtx import pylibdmtx
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 logging.basicConfig(level=logging.INFO) 
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ def lambda_handler(event, context):
         'ScanDate': scandate.isoformat(),
         'MPP': osr.properties.get(PROPERTY_NAME_APERIO_MPP),
         'AppMag': osr.properties.get(PROPERTY_NAME_APERIO_APPMAG),
-        'lastModified': datetime.utcnow().isoformat(),
+        'lastModified': datetime.now(timezone.utc).isoformat(timespec='milliseconds'),
     }
 
     # DynamoDB - put metadata
