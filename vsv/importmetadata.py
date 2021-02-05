@@ -55,10 +55,10 @@ def lambda_handler(event, context):
     scan_timezone = osr.properties.get(PROPERTY_NAME_APERIO_TZ)
     scandate = datetime.strptime(f'{scan_date} {scan_time} {scan_timezone}', '%m/%d/%y %H:%M:%S %Z%z')
     metadata = {
-        'Filename': image_filename,
-        'ImageID': image_id,
-        'SlideID': slide_id,
-        'CaseID': case_id,
+        'Filename': image_filename.strip(),
+        'ImageID': image_id.strip(),
+        'SlideID': slide_id.strip(),
+        'CaseID': case_id.strip(),
         'Status': 'NEW',
         'width': width,
         'height': height,

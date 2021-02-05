@@ -381,7 +381,7 @@ Resources:
 
               $!{expSet.put("#${entry.key}", ":${entry.key}")}
               $!{expNames.put("#${entry.key}", "${entry.key}")}
-              $!{expValues.put(":${entry.key}", $util.dynamodb.toDynamoDB($entry.value))}
+              $!{expValues.put(":${entry.key}", $util.dynamodb.toDynamoDB($entry.value.trim()))}
             #end
           #end
           
