@@ -107,7 +107,7 @@ Resources:
   ImportMetadataVersion:
     Type: AWS::Lambda::Version
     Properties: 
-      FunctionName: !Ref ImporttMetadata
+      FunctionName: !Ref ImportMetadata
   CheckFileTransfer:
     Type: AWS::Serverless::Function
     Properties:
