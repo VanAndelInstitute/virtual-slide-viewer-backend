@@ -103,8 +103,8 @@ Resources:
                             "dynamodb:UpdateItem"
                         ],
                         "Resource": [
-                            "arn:aws:dynamodb:us-east-2:839559484193:table/${SlideTable}",
-                            "arn:aws:dynamodb:us-east-2:839559484193:table/${SlideTable}/*"
+                            "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SlideTable}",
+                            "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SlideTable}/*"
                         ]
                     }
                 ]

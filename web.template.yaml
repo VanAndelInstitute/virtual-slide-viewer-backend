@@ -12,7 +12,6 @@ Parameters:
     Type: String
   BucketName:
     Type: String
-    Default: ''
     Description: A legal bucket name.  Must not exist.
   SemanticVersion:
     Type: String
@@ -36,6 +35,12 @@ Parameters:
   DomainName:
     Type: String
     Description: Custom FQDN of CloudFront distribution
+  HostedZoneDomainName:
+    Type: String
+    Description: hosted zone domain name
+  HostedZoneId:
+    Type: String
+    Description: hosted zone ID
   UserPoolArn:
     Type: String
     Description: The ARN of the Cognito user pool
@@ -50,16 +55,8 @@ Conditions:
 Resources:
   ApplicationBucket:
     Type: AWS::S3::Bucket
-    DeletionPolicy: Retain
     Properties:
-      BucketName: !If
-        - HasBucketName
-        - !Ref BucketName
-        - 'Fn::Transform':
-            Name: 'String'
-            Parameters:
-              InputString: !Sub '${AWS::StackName}-frontend'
-              Operation: Lower
+      BucketName: !Ref BucketName
   CloudFrontOriginAccessIdentity:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     DependsOn:
@@ -100,8 +97,8 @@ Resources:
     Properties: 
       DomainName: !Ref DomainName
       DomainValidationOptions: 
-        - DomainName: cptac.vai.org
-          HostedZoneId: Z0247982HZT5HOP8SFI4
+        - DomainName: !Ref HostedZoneDomainName
+          HostedZoneId: !Ref HostedZoneId
       ValidationMethod: DNS
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
@@ -201,7 +198,7 @@ Resources:
       AliasTarget:
         DNSName: !GetAtt CloudFrontDistribution.DomainName
         HostedZoneId: Z2FDTNDATAQYW2
-      HostedZoneId : Z0247982HZT5HOP8SFI4
+      HostedZoneId : !Ref HostedZoneId
       Name: !Ref DomainName
       Type: A
   DNSAAAAlias:
@@ -212,7 +209,7 @@ Resources:
       AliasTarget:
         DNSName: !GetAtt CloudFrontDistribution.DomainName
         HostedZoneId: Z2FDTNDATAQYW2
-      HostedZoneId : Z0247982HZT5HOP8SFI4
+      HostedZoneId : !Ref HostedZoneId
       Name: !Ref DomainName
       Type: AAAA
 Outputs:

@@ -116,21 +116,6 @@ Resources:
     Properties:
       RouteTableId: !Ref RouteTable
       SubnetId: !Ref SubnetB
-  SecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: VSV Security Group
-      VpcId: !Ref VPC
-      SecurityGroupEgress:
-        - CidrIp: '0.0.0.0/0'
-          FromPort: 0
-          ToPort: 65535
-          IpProtocol: tcp
-      SecurityGroupIngress:
-        - CidrIp: '0.0.0.0/0'
-          FromPort: 0
-          ToPort: 65535
-          IpProtocol: tcp
 
 Outputs:
   VpcId:
@@ -142,7 +127,4 @@ Outputs:
   RouteTableId:
     Description: 'The ID of the created route table of the VPC'
     Value: !Ref RouteTable
-  SecurityGroupId:
-    Description: 'The ID of the created security group'
-    Value: !Ref SecurityGroup
   

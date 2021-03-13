@@ -14,9 +14,9 @@ Parameters:
   FileSystem:
     Type: String
     Description: File system id of EfsFileSystem
-  SecurityGroup:
+  EfsSecurityGroup:
     Type: String
-    Description: Security group id of EfsLambdaSecurityGroup
+    Description: ID of the EFS security group
   AccessPointId:
     Type: String
     Description: ID of AccessPoint
@@ -30,9 +30,9 @@ Parameters:
   TableName:
     Type: String
     Description: Slide table for image metadata.
-  DataSyncTaskId:
+  DataSyncTaskArn:
     Type: String
-    Description: DataSync Task ID for image transfers
+    Description: ARN of the DataSync Task for image transfers
 
 Globals:
   Api:
@@ -43,6 +43,26 @@ Globals:
         ENV_TYPE: !Ref EnvType
 
 Resources:
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: VSV security group for Lambda
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - DestinationSecurityGroupId: !Ref EfsSecurityGroup
+          IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          Description: 'Allow access to VSV filesystem on EFS.'
+  EfsFromLambdaIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref EfsSecurityGroup
+      SourceSecurityGroupId: !Ref LambdaSecurityGroup
+      IpProtocol: tcp
+      FromPort: 2049
+      ToPort: 2049
+      Description: 'Allow access to VSV filesystem on EFS.'
   ImageRequest:
     Type: AWS::Serverless::Function
     Properties:
@@ -63,7 +83,7 @@ Resources:
             AccessPoint: !Ref AccessPointId
       VpcConfig:
         SecurityGroupIds:
-          - Ref: SecurityGroup
+          - Ref: LambdaSecurityGroup
         SubnetIds: !Ref Subnets
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
@@ -99,7 +119,7 @@ Resources:
             TableName: !Ref TableName
       VpcConfig:
         SecurityGroupIds:
-          - Ref: SecurityGroup
+          - Ref: LambdaSecurityGroup
         SubnetIds: !Ref Subnets
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
@@ -125,7 +145,7 @@ Resources:
             AccessPoint: !Ref AccessPointId
       VpcConfig:
         SecurityGroupIds:
-          - Ref: SecurityGroup
+          - Ref: LambdaSecurityGroup
         SubnetIds: !Ref Subnets
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
@@ -150,7 +170,7 @@ Resources:
           TABLE_NAME: !Ref TableName
           CHECK_FILE_FUNCTION: !Ref CheckFileTransferVersion
           METADATA_FUNCTION: !Ref ImportMetadataVersion
-          TASK_ARN: !Sub 'arn:aws:datasync:${AWS::Region}:${AWS::AccountId}:task/${DataSyncTaskId}'
+          TASK_ARN: !Ref DataSyncTaskArn
       Policies:
         - LambdaInvokePolicy:
             FunctionName: !Ref ImportMetadata
@@ -163,7 +183,7 @@ Resources:
               Action:
                 - datasync:DescribeTask
                 - datasync:StartTaskExecution
-              Resource: !Sub 'arn:aws:datasync:${AWS::Region}:${AWS::AccountId}:task/${DataSyncTaskId}'
+              Resource: !Ref DataSyncTaskArn
         - Statement:
             - Effect: Allow
               Action: ec2:DescribeNetworkInterfaces
@@ -194,7 +214,7 @@ Resources:
             TableName: !Ref TableName
       VpcConfig:
         SecurityGroupIds:
-          - Ref: SecurityGroup
+          - Ref: LambdaSecurityGroup
         SubnetIds: !Ref Subnets
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
@@ -219,13 +239,22 @@ Resources:
               - 'dynamodb:PutItem'
               - 'dynamodb:Query'
             Resource:
-              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}'
-              - !Sub 'arn:aws:dynamodb:us-east-2:839559484193:table/${TableName}/index/*'
+              - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TableName}'
+              - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TableName}/index/*'
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
       VpcEndpointType: Gateway
       RouteTableIds:
         - !Ref RouteTableId
       VpcId: !Ref VpcId
+  LambdaToDynamoDbEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref LambdaSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      DestinationPrefixListId: pl-4ca54025
+      Description: 'Allow access to DynamoDB gateway VPC endpoint.'
   OpenSlide:
     Type: AWS::Serverless::LayerVersion
     Properties:

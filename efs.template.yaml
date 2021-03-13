@@ -2,19 +2,20 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: 'EFS resources for Virtual Slide Viewer'
 Parameters:
-  VPC:
+  VpcId:
     Type: String
     Description: 'ID of your existing Virtual Private Cloud (VPC)'
   Subnets:
     Type: CommaDelimitedList
     Description: 'The list of Subnet IDs, for at least two Availability Zones in the region in your Virtual Private Cloud (VPC)'
-  SecurityGroup:
-    Type: String
-    Description: 'The ID of the security group to use'
   EnvType:
     Description: Runtime environment type.
     Default: dev
     Type: String
+  SourceLocationId:
+    Type: String
+    Default: ''
+    Description: ID of the source location for image transfers via DataSync
 
 Resources:
   FileSystem:
@@ -24,18 +25,41 @@ Resources:
       FileSystemTags:
         - Key: Name
           Value: !Sub '${AWS::StackName}'
+  EfsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: VSV security group for EFS
+      VpcId: !Ref VpcId
+  DataSyncSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: VSV security group for DataSync
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - DestinationSecurityGroupId: !Ref EfsSecurityGroup
+          IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+  EfsFromDataSyncIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref EfsSecurityGroup
+      SourceSecurityGroupId: !Ref DataSyncSecurityGroup
+      IpProtocol: tcp
+      FromPort: 2049
+      ToPort: 2049
   MountTargetA:
     Type: AWS::EFS::MountTarget
     Properties:
       FileSystemId: !Ref FileSystem
       SubnetId: !Select [ 0, !Ref Subnets ]
-      SecurityGroups: [!Ref SecurityGroup]
+      SecurityGroups: [!Ref EfsSecurityGroup]
   MountTargetB:
     Type: AWS::EFS::MountTarget
     Properties:
       FileSystemId: !Ref FileSystem
       SubnetId: !Select [ 1, !Ref Subnets ]
-      SecurityGroups: [!Ref SecurityGroup]
+      SecurityGroups: [!Ref EfsSecurityGroup]
   AccessPoint:
     Type: AWS::EFS::AccessPoint
     Properties:
@@ -49,6 +73,37 @@ Resources:
           OwnerGid: '1000'
           OwnerUid: '1000'
           Permissions: '755'
+  DestLocation:
+    Type: AWS::DataSync::LocationEFS
+    DependsOn:
+      - MountTargetA
+    Properties:
+      EfsFilesystemArn:
+        !GetAtt FileSystem.Arn
+      Ec2Config:
+        SecurityGroupArns:
+          - !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:security-group/${DataSyncSecurityGroup}
+        SubnetArn: !Sub
+          - arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${efsSubnetId}
+          - efsSubnetId: !Select [ 0, !Ref Subnets ]
+  DataSyncLogGroup: 
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/datasync
+      RetentionInDays: 60
+  DataSyncTask:
+    Type: AWS::DataSync::Task
+    Properties:
+      Name: 'ScanScope to EFS'
+      SourceLocationArn: !Sub arn:${AWS::Partition}:datasync:${AWS::Region}:${AWS::AccountId}:location/${SourceLocationId}
+      DestinationLocationArn: !Ref DestLocation
+      Options:
+        VerifyMode: 'ONLY_FILES_TRANSFERRED'
+        OverwriteMode: 'ALWAYS'
+        PreserveDeletedFiles: 'PRESERVE'
+        LogLevel: 'BASIC'
+      # CloudWatchLogGroupArn: !GetAtt DataSyncLogGroup.Arn
+      CloudWatchLogGroupArn: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/datasync
 Outputs:
   FileSystemId:
     Description: 'The ID of the created file system'
@@ -59,3 +114,9 @@ Outputs:
   AccessPointArn:
     Description: 'The ARN of the access point created for the file system'
     Value: !GetAtt AccessPoint.Arn
+  DataSyncTaskArn:
+    Description: ARN of the source location for image transfers via DataSync
+    Value: !Ref DataSyncTask
+  EfsSecurityGroupId:
+    Description: 'The ID of the EFS security group'
+    Value: !Ref EfsSecurityGroup

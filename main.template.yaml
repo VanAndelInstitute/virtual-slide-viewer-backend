@@ -14,9 +14,9 @@ Metadata:
         Parameters:
         - AvailabilityZones
       - Label:
-          default: Logic template parameters
+          default: Efs template parameters
         Parameters:
-        - DataSyncTaskId
+        - SourceLocationId
       - Label:
           default: Auth template parameters
         Parameters:
@@ -31,8 +31,8 @@ Metadata:
     ParameterLabels:
       EnvType:
         default: Environment type
-      DataSyncTaskId:
-        default: ID of the DataSync task ARN
+      SourceLocationId:
+        default: ID of the source location for image transfers via DataSync
       SupportsConfig:
         default: Use AWS Config
       AvailabilityZones:
@@ -63,9 +63,9 @@ Parameters:
   DomainName:
     Type: String
     Description: Custom FQDN of CloudFront distribution
-  DataSyncTaskId:
+  SourceLocationId:
     Type: String
-    Description: DataSync Task ID for image transfers
+    Description: ID of the source location for image transfers via DataSync
   SupportsConfig:
     Description: Is AWS Config Rules already configured for this region? Use ''false''
       if you are uncertain. See AWS Config Management Console or Deployment Guide
@@ -145,13 +145,15 @@ Resources:
       Location: efs.template.yaml
       Parameters:
         EnvType: !Ref EnvType
-        VPC: !GetAtt [VpcTemplate, Outputs.VpcId]
-        SecurityGroup: !GetAtt [VpcTemplate, Outputs.SecurityGroupId]
+        VpcId: !GetAtt [VpcTemplate, Outputs.VpcId]
         Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
+        SourceLocationId: !Ref SourceLocationId
   DbTemplate:
     Type: AWS::Serverless::Application
     Properties:
       Location: db.template.yaml
+      Parameters:
+        EnvType: !Ref EnvType
   FuncTemplate:
     Type: AWS::Serverless::Application
     DependsOn:
@@ -165,12 +167,12 @@ Resources:
         RouteTableId: !GetAtt [VpcTemplate, Outputs.RouteTableId]
         Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
         FileSystem: !GetAtt [EfsTemplate, Outputs.FileSystemId]
-        SecurityGroup: !GetAtt [VpcTemplate, Outputs.SecurityGroupId]
+        EfsSecurityGroup: !GetAtt [EfsTemplate, Outputs.EfsSecurityGroupId]
         AccessPointId: !GetAtt [EfsTemplate, Outputs.AccessPointId]
         AccessPointArn: !GetAtt [EfsTemplate, Outputs.AccessPointArn]
         EnvType: !Ref EnvType
         TableName: !GetAtt [DbTemplate, Outputs.TableName]
-        DataSyncTaskId: !Ref DataSyncTaskId
+        DataSyncTaskArn: !GetAtt [EfsTemplate, Outputs.DataSyncTaskArn]
   AuthTemplate:
     Type: AWS::Serverless::Application
     Properties:
@@ -199,12 +201,10 @@ Resources:
   #       UserPoolArn: !GetAtt [AuthTemplate, Outputs.UserPoolArn]
   #       UserPoolClientId: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]
 Outputs:
-  ApiDomain:
-    Description: FQDN of ImagesApi
-    Value: !GetAtt [FuncTemplate, Outputs.ApiDomain]
-  UserPoolArn:
-    Description: The ARN of the created user pool
-    Value: !GetAtt [AuthTemplate, Outputs.UserPoolArn]
-  UserPoolClientId:
-    Description: The ID of the created user pool client
-    Value: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]
+  ParameterOverrides:
+    Description: parameter-overrides for the web template deploy
+    Value: !Sub
+      - 'EnvType=${EnvType} ApiDomain=${ApiDomain} DomainName=${DomainName} UserPoolArn=${UserPoolArn} UserPoolClientId=${UserPoolClientId}'
+      - ApiDomain: !GetAtt [FuncTemplate, Outputs.ApiDomain]
+        UserPoolArn: !GetAtt [AuthTemplate, Outputs.UserPoolArn]
+        UserPoolClientId: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]
