@@ -5,6 +5,9 @@ Parameters:
     Description: Runtime environment type.
     Default: dev
     Type: String
+  UserPoolId:
+    Description: The ID of the created user pool
+    Type: String
 Resources:
   SlideTable:
     Type: AWS::DynamoDB::Table
@@ -59,6 +62,11 @@ Resources:
     Properties: 
       Name: !Ref AWS::StackName
       AuthenticationType: API_KEY
+      # AuthenticationType: AMAZON_COGNITO_USER_POOLS
+      # UserPoolConfig:
+      #   AwsRegion: !Sub ${AWS::Region}
+      #   DefaultAction: ALLOW
+      #   UserPoolId: !Ref UserPoolId
   GraphQLApiKey:
     Type: AWS::AppSync::ApiKey
     DependsOn:
@@ -447,10 +455,10 @@ Resources:
 
 Outputs:
   ApiId:
-    Description: ID of your GraphQL API
+    Description: ID for GraphQL API
     Value: !GetAtt GraphQLApi.ApiId
   ApiUrl:
-    Description: URL of your GraphQL API endpoint
+    Description: URL for GraphQL API endpoint
     Value: !GetAtt GraphQLApi.GraphQLUrl
   TableName:
     Description: Name of the created table

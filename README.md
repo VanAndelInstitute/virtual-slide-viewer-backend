@@ -20,15 +20,16 @@ Create the AWS SAM configuration file (samconfig.toml). You can create separate 
 ```
 $ sam deploy -t main.template.yaml --config-env $MAINCONFIG --stack-name $STACKNAME
 ```
-Insert the value of the ParameterOverrides output value into the CloudFront deploy parameters in samlconfig.toml. Also, edit the config.js files in the frontend to use the GraphQL API URL and key from the corresponding output parameters.
+Insert the value of the ParameterOverrides output value into the CloudFront deploy parameters in samlconfig.toml. Change 'GraphqlApi' value to just the domain name rather than the full URL (i.e., remove the protocol and path parts).
+Also, edit the config.js files in the frontend to use the GraphQL API URL and key from the corresponding output parameters.
 ### Deploy CloudFront infrastructure (in us-east-1 region only):
 _Note:_ You'll need to help CloudFormation create the ViewerCertificate resource by logging into AWS Certificate Manager and clicking the button to create a CNAME entry in Route 53 so it can validate the certificate.
 ```
 $ sam deploy -t web.template.yaml --config-env $WEBCONFIG --stack-name $STACKNAME
 ```
 ### Manual steps
-- [ ] Upload [the frontend](https://github.com/VanAndelInstitute/virtual-slide-viewer) build to the S3 bucket. Be sure to edit the appropriate keys in the config files first.
-- [ ] Update the expiration date on the AppSync API key.
+- [ ] Upload [the frontend](https://github.com/VanAndelInstitute/virtual-slide-viewer) build to the S3 bucket.
+- [ ] Extend the expiration date on the AppSync API key (since the default is 7 days).
 - [ ] Fix the permissions on EFS from an EC2 instance with the fs mounted and in the fs VPC:
 ```
 $ sudo chown -R ec2-user .

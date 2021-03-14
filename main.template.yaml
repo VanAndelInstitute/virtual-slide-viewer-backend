@@ -148,12 +148,29 @@ Resources:
         VpcId: !GetAtt [VpcTemplate, Outputs.VpcId]
         Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
         SourceLocationId: !Ref SourceLocationId
+  AuthTemplate:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: auth.template.yaml
+      Parameters:
+        AuthDomainPrefix: !Ref AuthDomainPrefix
+        DomainName: !Ref DomainName
+        FromEmailAddress: !Ref FromEmailAddress
+        FromEmailName: !Ref FromEmailName
+        OAuthScopes: !Ref OAuthScopes
+        OIDCClientId: !Ref OIDCClientId
+        OIDCClientSecret: !Ref OIDCClientSecret
+        OIDCIssuerURL: !Ref OIDCIssuerURL
+        OIDCProviderName: !Ref OIDCProviderName
   DbTemplate:
     Type: AWS::Serverless::Application
+    DependsOn:
+      - AuthTemplate
     Properties:
       Location: db.template.yaml
       Parameters:
         EnvType: !Ref EnvType
+        UserPoolId: !GetAtt [AuthTemplate, Outputs.UserPoolId]
   FuncTemplate:
     Type: AWS::Serverless::Application
     DependsOn:
@@ -173,20 +190,6 @@ Resources:
         EnvType: !Ref EnvType
         TableName: !GetAtt [DbTemplate, Outputs.TableName]
         DataSyncTaskArn: !GetAtt [EfsTemplate, Outputs.DataSyncTaskArn]
-  AuthTemplate:
-    Type: AWS::Serverless::Application
-    Properties:
-      Location: auth.template.yaml
-      Parameters:
-        AuthDomainPrefix: !Ref AuthDomainPrefix
-        DomainName: !Ref DomainName
-        FromEmailAddress: !Ref FromEmailAddress
-        FromEmailName: !Ref FromEmailName
-        OAuthScopes: !Ref OAuthScopes
-        OIDCClientId: !Ref OIDCClientId
-        OIDCClientSecret: !Ref OIDCClientSecret
-        OIDCIssuerURL: !Ref OIDCIssuerURL
-        OIDCProviderName: !Ref OIDCProviderName
   # WebTemplate:
   #   Type: AWS::Serverless::Application
   #   DependsOn:
@@ -201,19 +204,15 @@ Resources:
   #       UserPoolArn: !GetAtt [AuthTemplate, Outputs.UserPoolArn]
   #       UserPoolClientId: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]
 Outputs:
-  GraphqlApiUrl:
-    Description: URL of your GraphQL API endpoint
-    Value: !GetAtt [DbTemplate, Outputs.ApiUrl]
   DynamoDbTableName:
     Description: Name of the DynamoDB table
     Value: !GetAtt [DbTemplate, Outputs.TableName]
-  GraphqlApiKey:
-    Description: API key for GraphQL API endpoint
-    Value: !GetAtt [DbTemplate, Outputs.ApiKey]
   ParameterOverrides:
     Description: parameter-overrides for the web template deploy
     Value: !Sub
-      - 'EnvType=${EnvType} ApiDomain=${ApiDomain} DomainName=${DomainName} UserPoolArn=${UserPoolArn} UserPoolClientId=${UserPoolClientId}'
+      - 'EnvType=${EnvType} ApiDomain=${ApiDomain} DomainName=${DomainName} UserPoolArn=${UserPoolArn} UserPoolClientId=${UserPoolClientId} GraphqlApiKey=${GraphqlApiKey} GraphqlApiDomain=${GraphqlApiUrl}'
       - ApiDomain: !GetAtt [FuncTemplate, Outputs.ApiDomain]
         UserPoolArn: !GetAtt [AuthTemplate, Outputs.UserPoolArn]
         UserPoolClientId: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]
+        GraphqlApiKey: !GetAtt [DbTemplate, Outputs.ApiKey]
+        GraphqlApiUrl: !GetAtt [DbTemplate, Outputs.ApiUrl]

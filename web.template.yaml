@@ -46,6 +46,12 @@ Parameters:
     Description: The ARN of the Cognito user pool
   UserPoolClientId:
     Type: String
+  GraphqlApiKey:
+    Type: String
+    Description: Domain for GraphQL API endpoint
+  GraphqlApiDomain:
+    Type: String
+    Description: Domain for GraphQL API endpoint
   PriceClass:
     Type: String
     Description: CloudFront price class, e.g. PriceClass_200 for most regions (default), PriceClass_All for all regions (the default), PriceClass_100 least expensive (US, Canada, Europe), or PriceClass_All
@@ -156,6 +162,16 @@ Resources:
             TargetOriginId: API
             ViewerProtocolPolicy: redirect-to-https
             AllowedMethods: [GET,HEAD,OPTIONS,PUT,POST,PATCH,DELETE]
+          - PathPattern: /graphql
+            Compress: true
+            ForwardedValues:
+              QueryString: true
+            LambdaFunctionAssociations:
+              - EventType: viewer-request
+                LambdaFunctionARN: !GetAtt LambdaEdgeProtection.Outputs.CheckAuthHandler
+            TargetOriginId: GraphqlApi
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET,HEAD,OPTIONS,PUT,POST,PATCH,DELETE]
         DefaultCacheBehavior:
           Compress: true
           ForwardedValues:
@@ -184,6 +200,15 @@ Resources:
             Id: protected-origin
             S3OriginConfig:
               OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}'
+          - DomainName: !Ref GraphqlApiDomain
+            Id: GraphqlApi
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
+            OriginCustomHeaders:
+              - HeaderName: x-api-key
+                HeaderValue: !Ref GraphqlApiKey
         CustomErrorResponses:
             - ErrorCode: 404
               ResponseCode: 200

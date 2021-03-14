@@ -91,7 +91,7 @@ Resources:
       Domain: !Ref AuthDomainPrefix
 Outputs:
   UserPoolId:
-    Description: The ARN of the created user pool
+    Description: The ID of the created user pool
     Value: !Ref UserPool
   UserPoolArn:
     Description: The ARN of the created user pool
