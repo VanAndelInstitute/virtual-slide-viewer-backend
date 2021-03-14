@@ -47,14 +47,14 @@ Metadata:
         default: A custom prefix to use for the sign-up and sign-in pages that are hosted by Amazon Cognito
       DomainName:
         default: Custom FQDN of CloudFront distribution
-      # OIDCProviderName:
-      #   default: A name for the OIDC provider configuration
-      # OIDCClientId:
-      #   default: Client ID from OIDC provider
-      # OIDCClientSecret:
-      #   default: Client secret from OIDC provider
-      # OIDCIssuerURL:
-      #   default: Issuer URL from OIDC provider
+      OIDCProviderName:
+        default: A name for the OIDC provider configuration
+      OIDCClientId:
+        default: Client ID from OIDC provider
+      OIDCClientSecret:
+        default: Client secret from OIDC provider
+      OIDCIssuerURL:
+        default: Issuer URL from OIDC provider
 Parameters:
   EnvType:
     Description: Runtime environment type.
@@ -85,22 +85,22 @@ Parameters:
     Type: String
     Default: 'Virtual Slide Viewer'
   OAuthScopes:
-    Type: CommaDelimitedList
+    Type: String
     Description: The OAuth scopes to request the User Pool to add to the access token JWT
     Default: "phone, email, profile, openid, aws.cognito.signin.user.admin"
   AuthDomainPrefix:
     Type: String
     Description: A custom prefix to use for the sign-up and sign-in pages that are hosted by Amazon Cognito
-  # OIDCProviderName:
-  #   Type: String
-  # OIDCClientId:
-  #   Type: String
-  #   Default: dummy
-  # OIDCClientSecret:
-  #   Type: String
-  #   Default: dummy
-  # OIDCIssuerURL:
-  #   Type: String
+  OIDCProviderName:
+    Type: String
+  OIDCClientId:
+    Type: String
+    Default: dummy
+  OIDCClientSecret:
+    Type: String
+    Default: dummy
+  OIDCIssuerURL:
+    Type: String
   HttpHeaders:
     Type: String
     Description: The HTTP headers to set on all responses from CloudFront. Defaults are illustrations only and contain a report-only Cloud Security Policy -- adjust for your application
@@ -182,11 +182,11 @@ Resources:
         DomainName: !Ref DomainName
         FromEmailAddress: !Ref FromEmailAddress
         FromEmailName: !Ref FromEmailName
-        #OAuthScopes: !Ref OAuthScopes
-        # OIDCClientId: !Ref OIDCClientId
-        # OIDCClientSecret: !Ref OIDCClientSecret
-        # OIDCIssuerURL: !Ref OIDCIssuerURL
-        # OIDCProviderName: !Ref OIDCProviderName
+        OAuthScopes: !Ref OAuthScopes
+        OIDCClientId: !Ref OIDCClientId
+        OIDCClientSecret: !Ref OIDCClientSecret
+        OIDCIssuerURL: !Ref OIDCIssuerURL
+        OIDCProviderName: !Ref OIDCProviderName
   # WebTemplate:
   #   Type: AWS::Serverless::Application
   #   DependsOn:
@@ -201,6 +201,15 @@ Resources:
   #       UserPoolArn: !GetAtt [AuthTemplate, Outputs.UserPoolArn]
   #       UserPoolClientId: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]
 Outputs:
+  GraphqlApiUrl:
+    Description: URL of your GraphQL API endpoint
+    Value: !GetAtt [DbTemplate, Outputs.ApiUrl]
+  DynamoDbTableName:
+    Description: Name of the DynamoDB table
+    Value: !GetAtt [DbTemplate, Outputs.TableName]
+  GraphqlApiKey:
+    Description: API key for GraphQL API endpoint
+    Value: !GetAtt [DbTemplate, Outputs.ApiKey]
   ParameterOverrides:
     Description: parameter-overrides for the web template deploy
     Value: !Sub

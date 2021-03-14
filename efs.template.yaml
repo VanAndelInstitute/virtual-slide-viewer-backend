@@ -89,7 +89,7 @@ Resources:
   DataSyncLogGroup: 
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: /aws/datasync
+      LogGroupName: !Sub '/aws/datasync/${AWS::StackName}'
       RetentionInDays: 60
   DataSyncTask:
     Type: AWS::DataSync::Task

@@ -224,7 +224,7 @@ Resources:
           Type: Schedule
           Properties:
             Schedule: 'rate(1 day)'
-            Name: DeleteSlides
+            Name: !Sub ${AWS::StackName}-DeleteSlides
             Description: Delete files on EFS for slides marked as DELETED
             Enabled: False
   DynamoDbEndpoint:
