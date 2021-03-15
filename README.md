@@ -3,12 +3,13 @@ The VSV backend is implemented as an AWS Serverless application. It mounts an EF
 for DeepZoom tiles by using [OpenSlide Python](https://openslide.org/api/python/) to fetch TIFF tiles and [Pillow-SIMD](https://github.com/uploadcare/pillow-simd) to shrink tiles as needed.
 
 ## Build and deploy
-The infrastructure code is currently a [SAM app](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-getting-started.html). You'll need to [install Docker to build](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-using-build.html) the OpenSlide and libdmtx Lambda layers.
 
 ### Prerequisites
-- [ ] Create a SAM deployment bucket.
-- [ ] Validate the email address used for the user pool in Amazon SES (region us-east-1).
-- [ ] [Create/activate](README_DATASYNC.md) the AWS DataSync agent and create a source location for the ScanScope workstation.
+The infrastructure code is currently a [SAM app](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html). You'll need to install the [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html) and create a deployment bucket for the `sam package` command. You'll also need to [install Docker](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install-mac.html#serverless-sam-cli-install-mac-docker) for the [`--use-container` flag](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-using-build.html#build-zip-archive) to build the native Linux binaries for the OpenSlide and libdmtx Lambda layers.
+
+You'll also need:
+- [ ] A validated email address used for the user pool in Amazon SES ([in region us-east-1 or us-west-2](https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-email.html#user-pool-email-developer)).
+- [ ] An [AWS DataSync agent](README_DATASYNC.md) and a source location for the ScanScope workstation. These resources will be shared among multiple deployments.
 
 ### Build and package function resources:
 ```
@@ -22,7 +23,7 @@ $ sam deploy -t main.template.yaml --config-env $MAINCONFIG --stack-name $STACKN
 ```
 Insert the value of the ParameterOverrides output value into the CloudFront deploy parameters in samlconfig.toml. Change 'GraphqlApi' value to just the domain name rather than the full URL (i.e., remove the protocol and path parts).
 Also, edit the config.js files in the frontend to use the GraphQL API URL and key from the corresponding output parameters.
-### Deploy CloudFront infrastructure (in us-east-1 region only):
+### Deploy CloudFront infrastructure ([in us-east-1 region only](https://github.com/aws-samples/cloudfront-authorization-at-edge#deployment-region)):
 _Note:_ You'll need to help CloudFormation create the ViewerCertificate resource by logging into AWS Certificate Manager and clicking the button to create a CNAME entry in Route 53 so it can validate the certificate.
 ```
 $ sam deploy -t web.template.yaml --config-env $WEBCONFIG --stack-name $STACKNAME
