@@ -13,7 +13,7 @@ You'll also need:
 
 ### Build and package function resources:
 ```
-$ sam build -u -t func.template.yaml
+$ sam build -u -t func.template.yaml --cached
 $ sam package --s3-bucket $DEPLOYBUCKET --s3-prefix $S3PREFIX --output-template-file template.yaml
 ```
 ### Deploy all infrastructure except CloudFront (in any region):

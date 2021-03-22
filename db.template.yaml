@@ -50,6 +50,7 @@ Resources:
               - AppMag
               - MPP
               - ScanDate
+              - Filename
             ProjectionType: INCLUDE
       SSESpecification:
         SSEEnabled: true
@@ -161,6 +162,7 @@ Resources:
             height: Int
             width: Int
             Status: String
+            Filename: String
           }
 
           type SlideConnection {

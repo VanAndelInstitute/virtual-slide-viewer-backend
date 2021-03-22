@@ -113,6 +113,8 @@ Parameters:
         "X-Frame-Options": "DENY",
         "X-Content-Type-Options": "nosniff"
       }
+  ImagesBucketName:
+    Type: String
   
 Conditions:
   LoadConfigRulesTemplate:
@@ -148,6 +150,7 @@ Resources:
         VpcId: !GetAtt [VpcTemplate, Outputs.VpcId]
         Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
         SourceLocationId: !Ref SourceLocationId
+        ImagesBucketName: !Ref ImagesBucketName
   AuthTemplate:
     Type: AWS::Serverless::Application
     Properties:
@@ -190,6 +193,7 @@ Resources:
         EnvType: !Ref EnvType
         TableName: !GetAtt [DbTemplate, Outputs.TableName]
         DataSyncTaskArn: !GetAtt [EfsTemplate, Outputs.DataSyncTaskArn]
+        ImagesBucketName: !Ref ImagesBucketName
   # WebTemplate:
   #   Type: AWS::Serverless::Application
   #   DependsOn:
