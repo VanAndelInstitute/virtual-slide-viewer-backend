@@ -107,6 +107,9 @@ Resources:
       Timeout: 120
       MemorySize: 1536
       AutoPublishAlias: live
+      EventInvokeConfig:
+        MaximumEventAgeInSeconds: 180
+        MaximumRetryAttempts: 0
       Environment:
         Variables:
           IMAGES_PATH: !Sub '/mnt/${FileSystem}'
@@ -126,8 +129,8 @@ Resources:
           - Ref: LambdaSecurityGroup
         SubnetIds: !Ref Subnets
       FileSystemConfigs:
-          - Arn: !Ref AccessPointArn
-            LocalMountPath: !Sub '/mnt/${FileSystem}'
+        - Arn: !Ref AccessPointArn
+          LocalMountPath: !Sub '/mnt/${FileSystem}'
   CheckFileTransfer:
     Type: AWS::Serverless::Function
     Properties:
@@ -137,6 +140,9 @@ Resources:
       Timeout: 3
       MemorySize: 128
       AutoPublishAlias: live
+      EventInvokeConfig:
+        MaximumEventAgeInSeconds: 180
+        MaximumRetryAttempts: 0
       Environment:
         Variables:
           IMAGES_PATH: !Sub '/mnt/${FileSystem}'
@@ -162,6 +168,9 @@ Resources:
       Runtime: python3.8
       Timeout: 29
       MemorySize: 256
+      EventInvokeConfig:
+        MaximumEventAgeInSeconds: 180
+        MaximumRetryAttempts: 0
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
