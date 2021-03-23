@@ -10,7 +10,7 @@ Parameters:
     Description: Runtime environment type.
     Default: dev
     Type: String
-  BucketName:
+  AppBucketName:
     Type: String
     Description: A legal bucket name.  Must not exist.
   SemanticVersion:
@@ -56,13 +56,12 @@ Parameters:
     Type: String
     Description: CloudFront price class, e.g. PriceClass_200 for most regions (default), PriceClass_All for all regions (the default), PriceClass_100 least expensive (US, Canada, Europe), or PriceClass_All
     Default: PriceClass_100
-Conditions:
-  HasBucketName: !Not [!Equals [!Ref BucketName, '']]
+
 Resources:
   ApplicationBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Ref BucketName
+      BucketName: !Ref AppBucketName
   CloudFrontOriginAccessIdentity:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     DependsOn:
@@ -162,6 +161,16 @@ Resources:
             TargetOriginId: API
             ViewerProtocolPolicy: redirect-to-https
             AllowedMethods: [GET,HEAD,OPTIONS,PUT,POST,PATCH,DELETE]
+          - PathPattern: /RemoveImages
+            Compress: true
+            ForwardedValues:
+              QueryString: true
+            LambdaFunctionAssociations:
+              - EventType: viewer-request
+                LambdaFunctionARN: !GetAtt LambdaEdgeProtection.Outputs.CheckAuthHandler
+            TargetOriginId: API
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET,HEAD,OPTIONS,PUT,POST,PATCH,DELETE]
           - PathPattern: /graphql
             Compress: true
             ForwardedValues:
@@ -238,7 +247,7 @@ Resources:
       Name: !Ref DomainName
       Type: AAAA
 Outputs:
-  BucketName:
+  AppBucketName:
     Description: Name of the created bucket for front-end resources
     Value: !Ref ApplicationBucket
   CloudFrontDistId:
