@@ -1,4 +1,5 @@
 import os
+from shutil import rmtree
 import botocore
 import boto3
 import logging
@@ -33,9 +34,8 @@ def lambda_handler(event, context):
         os.remove(event['Filename'])
         image_id = event['ImageID']
         os.remove(f'{image_id}.dzi')
-        for file in glob.glob(f'{image_id}_files/*.*'):
-            if not file.startswith('thumbnail') and not file.startswith('label'):
-                os.remove(file)
+        for subdir in glob.glob(f'{image_id}_files/*/'): # delete cache files w/o deleting assoc images
+            rmtree(subdir)
         logger.info(f'Deleted files for image {event["Filename"]}.')
         
         # update db status
