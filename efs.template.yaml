@@ -109,6 +109,7 @@ Resources:
       CloudWatchLogGroupArn: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/datasync/${AWS::StackName}
   ImagesBucket:
     Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
     Properties:
       BucketName: !Ref ImagesBucketName
 Outputs:
