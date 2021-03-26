@@ -36,15 +36,12 @@ Parameters:
   CIDR:
     Description: CIDR block for  VPC
     Type: String
-    Default: 10.100.0.0/16
   SubnetACIDR:
     Description: CIDR block for AZ-1b subnet
     Type: String
-    Default: 10.100.10.0/24
   SubnetBCIDR:
     Description: CIDR block for AZ-1b subnet
     Type: String
-    Default: 10.100.20.0/24
 Resources:
   VPC:
     Type: AWS::EC2::VPC

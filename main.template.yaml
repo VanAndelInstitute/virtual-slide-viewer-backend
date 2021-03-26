@@ -115,12 +115,25 @@ Parameters:
       }
   ImagesBucketName:
     Type: String
-  
+  CIDR:
+    Description: CIDR block for  VPC
+    Type: String
+    Default: 10.100.0.0/16
+  SubnetACIDR:
+    Description: CIDR block for AZ-1b subnet
+    Type: String
+    Default: 10.100.10.0/24
+  SubnetBCIDR:
+    Description: CIDR block for AZ-1b subnet
+    Type: String
+    Default: 10.100.20.0/24
+
 Conditions:
   LoadConfigRulesTemplate:
     !Equals
     - !Ref SupportsConfig
     - 'true'
+
 Resources:
   VpcTemplate:
     Type: AWS::Serverless::Application
@@ -136,9 +149,9 @@ Resources:
           !Select
           - 1
           - !Ref AvailabilityZones
-        #CIDR: 10.100.0.0/16
-        #SubnetACIDR: 10.100.10.0/24
-        #SubnetBCIDR: 10.100.20.0/24
+        CIDR: !Ref CIDR
+        SubnetACIDR: !Ref SubnetACIDR
+        SubnetBCIDR: !Ref SubnetBCIDR
   EfsTemplate:
     Type: AWS::Serverless::Application
     DependsOn:
