@@ -62,12 +62,11 @@ Resources:
     Type: AWS::AppSync::GraphQLApi
     Properties: 
       Name: !Ref AWS::StackName
-      AuthenticationType: API_KEY
-      # AuthenticationType: AMAZON_COGNITO_USER_POOLS
-      # UserPoolConfig:
-      #   AwsRegion: !Sub ${AWS::Region}
-      #   DefaultAction: ALLOW
-      #   UserPoolId: !Ref UserPoolId
+      AuthenticationType: AMAZON_COGNITO_USER_POOLS
+      UserPoolConfig:
+        AwsRegion: !Sub ${AWS::Region}
+        DefaultAction: ALLOW
+        UserPoolId: !Ref UserPoolId
   GraphQLApiKey:
     Type: AWS::AppSync::ApiKey
     DependsOn:
