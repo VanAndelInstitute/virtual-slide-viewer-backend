@@ -141,6 +141,7 @@ Resources:
       Definition: |-
           type Mutation {
             updateSlide(input: UpdateSlideInput!): Slide
+              @aws_auth(cognito_groups: ["Technicians"])
           }
 
           type Query {
