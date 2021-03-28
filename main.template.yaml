@@ -232,15 +232,13 @@ Outputs:
     Value: !GetAtt [FuncTemplate, Outputs.ApiUrl]
   region:
     Value: !Sub ${AWS::Region}
-  Auth_userPoolId:
+  AuthUserPoolId:
     Value: !GetAtt [AuthTemplate, Outputs.UserPoolId]
-  Auth_userPoolWebClientId:
+  AuthUserPoolWebClientId:
     Value: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]
-  aws_appsync_graphqlEndpoint:
+  AppsyncGraphqlEndpoint:
     Value: !GetAtt [DbTemplate, Outputs.ApiUrl]
-  aws_appsync_region:
-    Value: !Sub ${AWS::Region}
-  aws_appsync_authenticationType:
+  AppsyncAuthenticationType:
     Value: AMAZON_COGNITO_USER_POOLS
-  API_endpoint:
+  ApiEndpoint:
     Value: !GetAtt [FuncTemplate, Outputs.ApiUrl]
