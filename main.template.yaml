@@ -60,9 +60,24 @@ Parameters:
     Description: Runtime environment type.
     Default: dev
     Type: String
+  ApiDomain:
+    Type: String
+    Description: The FQDN of the API Gateway deployment
+  AppBucketName:
+    Type: String
+    Description: A legal bucket name.  Must not exist.
   DomainName:
     Type: String
     Description: Custom FQDN of CloudFront distribution
+  HostedZoneDomainName:
+    Type: String
+    Description: hosted zone domain name
+  HostedZoneId:
+    Type: String
+    Description: hosted zone ID
+  ViewerCertificateArn:
+    Type: String
+    Description: ARN of the SSL certificate for the DomainName
   SourceLocationId:
     Type: String
     Description: ID of the source location for image transfers via DataSync
@@ -101,18 +116,6 @@ Parameters:
     Default: dummy
   OIDCIssuerURL:
     Type: String
-  HttpHeaders:
-    Type: String
-    Description: The HTTP headers to set on all responses from CloudFront. Defaults are illustrations only and contain a report-only Cloud Security Policy -- adjust for your application
-    Default: >-
-      {
-        "Content-Security-Policy-Report-Only": "default-src 'none'; img-src 'self' data: https://${ApiId}.execute-api.${AWS::Region}.${AWS::URLSuffix}; script-src 'self'; style-src 'self'; object-src 'none'; connect-src 'self' https://*.amazonaws.com https://*.amazoncognito.com",
-        "Strict-Transport-Security": "max-age=31536000; includeSubdomains; preload",
-        "Referrer-Policy": "same-origin",
-        "X-XSS-Protection": "1; mode=block",
-        "X-Frame-Options": "DENY",
-        "X-Content-Type-Options": "nosniff"
-      }
   ImagesBucketName:
     Type: String
   CIDR:
@@ -207,29 +210,35 @@ Resources:
         TableName: !GetAtt [DbTemplate, Outputs.TableName]
         DataSyncTaskArn: !GetAtt [EfsTemplate, Outputs.DataSyncTaskArn]
         ImagesBucketName: !Ref ImagesBucketName
-  # WebTemplate:
-  #   Type: AWS::Serverless::Application
-  #   DependsOn:
-  #     - FuncTemplate
-  #     - AuthTemplate
-  #   Properties:
-  #     Location: web.template.yaml
-  #     Parameters:
-  #       EnvType: !Ref EnvType
-  #       ApiDomain: !GetAtt [FuncTemplate, Outputs.ApiDomain]
-  #       DomainName: !Ref DomainName
-  #       UserPoolArn: !GetAtt [AuthTemplate, Outputs.UserPoolArn]
-  #       UserPoolClientId: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]
+  WebTemplate:
+    Type: AWS::Serverless::Application
+    DependsOn:
+      - FuncTemplate
+      - AuthTemplate
+    Properties:
+      Location: web.template.yaml
+      Parameters:
+        EnvType: !Ref EnvType
+        ApiDomain: !GetAtt [FuncTemplate, Outputs.ApiDomain]
+        AppBucketName: !Ref AppBucketName
+        DomainName: !Ref DomainName
+        HostedZoneId: !Ref HostedZoneId
+        HostedZoneDomainName: !Ref HostedZoneDomainName
+        ViewerCertificateArn: !Ref ViewerCertificateArn
 Outputs:
   DynamoDbTableName:
-    Description: Name of the DynamoDB table
     Value: !GetAtt [DbTemplate, Outputs.TableName]
-  ParameterOverrides:
-    Description: parameter-overrides for the web template deploy
-    Value: !Sub
-      - 'EnvType=${EnvType} ApiDomain=${ApiDomain} DomainName=${DomainName} UserPoolArn=${UserPoolArn} UserPoolClientId=${UserPoolClientId} GraphqlApiKey=${GraphqlApiKey} GraphqlApiDomain=${GraphqlApiUrl}'
-      - ApiDomain: !GetAtt [FuncTemplate, Outputs.ApiDomain]
-        UserPoolArn: !GetAtt [AuthTemplate, Outputs.UserPoolArn]
-        UserPoolClientId: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]
-        GraphqlApiKey: !GetAtt [DbTemplate, Outputs.ApiKey]
-        GraphqlApiUrl: !GetAtt [DbTemplate, Outputs.ApiUrl]
+  ApiUrl:
+    Value: !GetAtt [FuncTemplate, Outputs.ApiUrl]
+  region:
+    Value: !Sub ${AWS::Region}
+  AuthUserPoolId:
+    Value: !GetAtt [AuthTemplate, Outputs.UserPoolId]
+  AuthUserPoolWebClientId:
+    Value: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]
+  AppsyncGraphqlEndpoint:
+    Value: !GetAtt [DbTemplate, Outputs.ApiUrl]
+  AppsyncAuthenticationType:
+    Value: AMAZON_COGNITO_USER_POOLS
+  ApiEndpoint:
+    Value: !GetAtt [FuncTemplate, Outputs.ApiUrl]
