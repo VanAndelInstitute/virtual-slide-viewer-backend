@@ -247,3 +247,5 @@ $RECYCLE.BIN/
 # dev local SAM config and template files
 *.toml
 template.yaml
+
+**/node_modules/

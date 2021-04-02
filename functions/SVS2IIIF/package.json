@@ -1,0 +1,26 @@
+{
+  "name": "SVS2IIIF",
+  "version": "1.0.0",
+  "main": "tiff.js",
+  "type": "module",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.10.0",
+    "@petamoriken/float16": "^2.0.0",
+    "axios": "^0.21.1",
+    "buffer-dataview": "^0.0.2",
+    "node-fetch": "^2.6.1"
+  },
+  "devDependencies": {
+    "eslint": "^7.23.0",
+    "eslint-plugin-import": "^2.22.1",
+    "parcel-bundler": "^1.12.5"
+  },
+  "scripts": {
+    "build": "npm run build:clean; npm run build:node;",
+    "build:clean": "rimraf dist-node/",
+    "build:node": "parcel build tiff.js --target node --out-dir dist-node/",
+    "dev": "parcel serve test/data/** test/index.html src/ --port 8090",
+    "dev:clean": "rm -rf dist/ .cache/"
+  }
+}
