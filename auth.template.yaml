@@ -89,6 +89,13 @@ Resources:
     Properties:
       UserPoolId: !Ref UserPool
       Domain: !Ref AuthDomainPrefix
+  TechniciansGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties: 
+      Description: Users with write access to the data
+      GroupName: Technicians
+      UserPoolId: !Ref UserPool
+
 Outputs:
   UserPoolId:
     Description: The ID of the created user pool
