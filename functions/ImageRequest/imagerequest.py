@@ -4,11 +4,31 @@ import base64
 import json
 import re
 from io import BytesIO
-from slidecache import load_slide, check_cache, IMAGES_PATH, DEEPZOOM_TILE_QUALITY
+from slidecache import VsvDeepZoomGenerator
 import logging
 logging.basicConfig(level=logging.INFO) 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+DEEPZOOM_FORMAT_DEFAULT = 'jpeg'
+DEEPZOOM_TILE_SIZE_DEFAULT = 720
+DEEPZOOM_OVERLAP_DEFAULT = 0
+DEEPZOOM_LIMIT_BOUNDS = False
+IMAGES_PATH = os.environ.get('IMAGES_PATH', '/tmp')
+DEEPZOOM_TILE_QUALITY = 70
+
+open_slides = {}
+
+def load_slide(image_id, tile_size=None, overlap=None, _format=None):
+    if image_id in open_slides:
+        return open_slides[image_id]
+
+    tile_size = tile_size or DEEPZOOM_TILE_SIZE_DEFAULT
+    overlap = overlap if overlap is not None else DEEPZOOM_OVERLAP_DEFAULT
+    _format = _format or DEEPZOOM_FORMAT_DEFAULT
+    dz = open_slides[image_id] = VsvDeepZoomGenerator(image_id, tile_size, overlap, _format)
+
+    return dz
 
 def respond(success, error=None, status=200, content_type=None):
  
@@ -76,20 +96,12 @@ def lambda_handler(event, context):
             col = int(match.group('col'))
             row = int(match.group('row'))
             _format = match.group('format')
-            file_path, cache_valid = check_cache(image_id, level, col, row, _format)
-            if cache_valid:
-                logger.info('From cache')
-                # cache hit
-                with open(file_path, 'rb') as f:
-                    result = f.read()
-            else:
-                # cache miss
-                dz = load_slide(image_id)
-                tile = dz.get_tile(level, (col, row))
-                buf = BytesIO()
-                tile.save(buf, _format, quality=DEEPZOOM_TILE_QUALITY)
-                tile.close()
-                result = buf.getvalue()
+            dz = load_slide(image_id)
+            tile = dz.get_tile(level, (col, row))
+            buf = BytesIO()
+            tile.save(buf, _format, quality=DEEPZOOM_TILE_QUALITY)
+            tile.close()
+            result = buf.getvalue()
 
         return respond(base64.b64encode(result), content_type=f'image/{_format}')
         

@@ -174,8 +174,8 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
-          CHECK_FILE_FUNCTION: !Ref CheckFileTransfer.Version
-          METADATA_FUNCTION: !Ref ImportMetadata.Version
+          CHECK_FILE_FUNCTION: !Ref CheckFileTransfer.Alias
+          METADATA_FUNCTION: !Ref ImportMetadata.Alias
           TASK_ARN: !Ref DataSyncTaskArn
       Policies:
         - LambdaInvokePolicy:
@@ -264,8 +264,8 @@ Resources:
       Timeout: 15
       Environment:
         Variables:
-          TRANSFER_FUNCTION: !Ref TransferImageAsync.Version
-          DELETE_FUNCTION: !Ref DeleteImageAsync.Version
+          TRANSFER_FUNCTION: !Ref TransferImageAsync.Alias
+          DELETE_FUNCTION: !Ref DeleteImageAsync.Alias
       Policies:
         - LambdaInvokePolicy:
             FunctionName: !Ref TransferImageAsync
