@@ -80,15 +80,15 @@ class CachedDeepZoomGenerator(DeepZoomGenerator):
             raise ValueError("Invalid address")
 
         # Calculate top/left and bottom/right overlap
-        left_overlap = DEEPZOOM_OVERLAP_DEFAULT * int(col != 0)
-        top_overlap = DEEPZOOM_OVERLAP_DEFAULT * int(row != 0)
-        right_overlap = DEEPZOOM_OVERLAP_DEFAULT * int(col + num_cols != col_lim)
-        bottom_overlap = DEEPZOOM_OVERLAP_DEFAULT * int(row + num_rows != row_lim)
+        left_overlap = self.overlap * int(col != 0)
+        top_overlap = self.overlap * int(row != 0)
+        right_overlap = self.overlap * int(col + num_cols != col_lim)
+        bottom_overlap = self.overlap * int(row + num_rows != row_lim)
 
         # Get final size of the region
         w_lim, h_lim = self.level_dimensions[dz_level]
-        w = num_cols * min(DEEPZOOM_TILE_SIZE_DEFAULT, w_lim - DEEPZOOM_TILE_SIZE_DEFAULT * col) + left_overlap + right_overlap
-        h = num_rows * min(DEEPZOOM_TILE_SIZE_DEFAULT, h_lim - DEEPZOOM_TILE_SIZE_DEFAULT * row) + top_overlap + bottom_overlap
+        w = num_cols * min(self.tile_size, w_lim - self.tile_size * col) + left_overlap + right_overlap
+        h = num_rows * min(self.tile_size, h_lim - self.tile_size * row) + top_overlap + bottom_overlap
         return w, h
 
     def get_best_slide_level_for_dz_level(self, dz_level):
@@ -109,12 +109,12 @@ class CachedDeepZoomGenerator(DeepZoomGenerator):
         x_lim, y_lim = self._osr.level_dimensions[slide_level]
 
         # Calculate top/left and bottom/right overlap
-        left_overlap = DEEPZOOM_OVERLAP_DEFAULT * int(col != 0)
-        top_overlap = DEEPZOOM_OVERLAP_DEFAULT * int(row != 0)
+        left_overlap = self.overlap * int(col != 0)
+        top_overlap = self.overlap * int(row != 0)
         
         # Obtain the region coordinates in {slide_level} reference frame. Expand by top/left overlap if exists.
-        xl = dz_downsample * ((DEEPZOOM_TILE_SIZE_DEFAULT * col) - left_overlap)
-        yl = dz_downsample * ((DEEPZOOM_TILE_SIZE_DEFAULT * row) - top_overlap)
+        xl = dz_downsample * ((self.tile_size * col) - left_overlap)
+        yl = dz_downsample * ((self.tile_size * row) - top_overlap)
         # OpenSlide.read_region wants coordinates in level 0 reference frame.
         x0, y0 = l_downsample * xl, l_downsample * yl
         # OpenSlide.read_region wants dimensions in {slide_level} reference frame.
@@ -148,7 +148,7 @@ def load_slide(image_id, tile_size=None, overlap=None, _format=None):
         invalidate_cache = True
 
     tile_size = tile_size or saved_tile_size or DEEPZOOM_TILE_SIZE_DEFAULT
-    overlap = overlap if overlap is not None else saved_overlap or DEEPZOOM_OVERLAP_DEFAULT
+    overlap = overlap if overlap is not None else saved_overlap if saved_overlap is not None else DEEPZOOM_OVERLAP_DEFAULT
     _format = _format or saved_format or DEEPZOOM_FORMAT_DEFAULT
     dz = open_slides[image_id] = CachedDeepZoomGenerator(image_id, tile_size, overlap, _format)
 
