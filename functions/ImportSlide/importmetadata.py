@@ -30,12 +30,12 @@ def lambda_handler(event, context):
     image_id = osr.properties.get(PROPERTY_NAME_APERIO_IMAGEID)
     
     # Extract label and thumbnail images
-    imagedir = os.path.join(IMAGES_PATH, f'{image_id}_files/')
+    imagedir = os.path.join(IMAGES_PATH, f'{image_id}/')
     os.makedirs(imagedir, exist_ok=True)
     thumbnail = osr.associated_images.get(u'thumbnail').convert('RGB')
-    thumbnail.save(os.path.join(IMAGES_PATH, f'{image_id}_files/thumbnail.jpg'))
+    thumbnail.save(os.path.join(IMAGES_PATH, f'{image_id}/thumbnail.jpg'))
     label = osr.associated_images.get(u'label').convert('RGB')
-    label.save(os.path.join(IMAGES_PATH, f'{image_id}_files/label.jpg'))
+    label.save(os.path.join(IMAGES_PATH, f'{image_id}/label.jpg'))
 
     # decode slide id from 2D Data Matrix barcode in label image
     label_data = pylibdmtx.decode(label)

@@ -66,11 +66,43 @@ Resources:
       FromPort: 2049
       ToPort: 2049
       Description: 'Allow access to VSV filesystem on EFS.'
-  ImageRequest:
+  IIIF:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: functions/ImageRequest
-      Handler: imagerequest.lambda_handler
+      Handler: iiif.lambda_handler
+      Runtime: python3.8
+      Timeout: 15
+      MemorySize: 640
+      Environment:
+        Variables:
+          IMAGES_PATH: !Sub '/mnt/${FileSystem}'
+      Layers:
+        - !Ref OpenSlide
+        - !Ref PillowSIMD
+      Policies:
+        - EFSWriteAccessPolicy:
+            FileSystem: !Ref FileSystem
+            AccessPoint: !Ref AccessPointId
+      VpcConfig:
+        SecurityGroupIds:
+          - Ref: LambdaSecurityGroup
+        SubnetIds: !Ref Subnets
+      FileSystemConfigs:
+          - Arn: !Ref AccessPointArn
+            LocalMountPath: !Sub '/mnt/${FileSystem}'
+      Events:
+        ImagesApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ImagesApi
+            Path: /image-service/{imagePath+}
+            Method: GET
+  DeepZoom:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/ImageRequest
+      Handler: deepzoom.lambda_handler
       Runtime: python3.8
       Timeout: 15
       MemorySize: 640
