@@ -66,11 +66,43 @@ Resources:
       FromPort: 2049
       ToPort: 2049
       Description: 'Allow access to VSV filesystem on EFS.'
-  ImageRequest:
+  IIIF:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: functions/ImageRequest
-      Handler: imagerequest.lambda_handler
+      Handler: iiif.lambda_handler
+      Runtime: python3.8
+      Timeout: 15
+      MemorySize: 640
+      Environment:
+        Variables:
+          IMAGES_PATH: !Sub '/mnt/${FileSystem}'
+      Layers:
+        - !Ref OpenSlide
+        - !Ref PillowSIMD
+      Policies:
+        - EFSWriteAccessPolicy:
+            FileSystem: !Ref FileSystem
+            AccessPoint: !Ref AccessPointId
+      VpcConfig:
+        SecurityGroupIds:
+          - Ref: LambdaSecurityGroup
+        SubnetIds: !Ref Subnets
+      FileSystemConfigs:
+          - Arn: !Ref AccessPointArn
+            LocalMountPath: !Sub '/mnt/${FileSystem}'
+      Events:
+        ImagesApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ImagesApi
+            Path: /image-service/{imagePath+}
+            Method: GET
+  DeepZoom:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/ImageRequest
+      Handler: deepzoom.lambda_handler
       Runtime: python3.8
       Timeout: 15
       MemorySize: 640
@@ -174,8 +206,8 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
-          CHECK_FILE_FUNCTION: !Ref CheckFileTransfer.Version
-          METADATA_FUNCTION: !Ref ImportMetadata.Version
+          CHECK_FILE_FUNCTION: !Ref CheckFileTransfer.Alias
+          METADATA_FUNCTION: !Ref ImportMetadata.Alias
           TASK_ARN: !Ref DataSyncTaskArn
       Policies:
         - LambdaInvokePolicy:
@@ -264,8 +296,8 @@ Resources:
       Timeout: 15
       Environment:
         Variables:
-          TRANSFER_FUNCTION: !Ref TransferImageAsync.Version
-          DELETE_FUNCTION: !Ref DeleteImageAsync.Version
+          TRANSFER_FUNCTION: !Ref TransferImageAsync.Alias
+          DELETE_FUNCTION: !Ref DeleteImageAsync.Alias
       Policies:
         - LambdaInvokePolicy:
             FunctionName: !Ref TransferImageAsync

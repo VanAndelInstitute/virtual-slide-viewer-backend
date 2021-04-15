@@ -13,5 +13,5 @@ def lambda_handler(event, context):
     os.remove(event['Filename'])
     image_id = event['ImageID']
     os.remove(f'{image_id}.dzi')
-    rmtree(f'{image_id}_files')
+    rmtree(f'{image_id}')
     logger.info(f'Deleted {event["ImageID"]} files')

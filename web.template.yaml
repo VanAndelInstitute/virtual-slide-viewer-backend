@@ -78,6 +78,14 @@ Resources:
                 - Accept
             TargetOriginId: API
             ViewerProtocolPolicy: redirect-to-https
+          - PathPattern: /image-service/*
+            Compress: true
+            ForwardedValues:
+              QueryString: true
+              Headers:
+                - Accept
+            TargetOriginId: API
+            ViewerProtocolPolicy: redirect-to-https
           - PathPattern: /ImportSlide
             Compress: true
             ForwardedValues:
