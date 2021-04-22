@@ -60,9 +60,6 @@ Parameters:
     Description: Runtime environment type.
     Default: dev
     Type: String
-  ApiDomain:
-    Type: String
-    Description: The FQDN of the API Gateway deployment
   AppBucketName:
     Type: String
     Description: A legal bucket name.  Must not exist.
@@ -240,5 +237,3 @@ Outputs:
     Value: !GetAtt [DbTemplate, Outputs.ApiUrl]
   AppsyncAuthenticationType:
     Value: AMAZON_COGNITO_USER_POOLS
-  ApiEndpoint:
-    Value: !GetAtt [FuncTemplate, Outputs.ApiUrl]
