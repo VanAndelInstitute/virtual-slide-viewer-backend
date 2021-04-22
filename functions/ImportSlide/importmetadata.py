@@ -33,9 +33,9 @@ def lambda_handler(event, context):
     imagedir = os.path.join(IMAGES_PATH, f'{image_id}/')
     os.makedirs(imagedir, exist_ok=True)
     thumbnail = osr.associated_images.get(u'thumbnail').convert('RGB')
-    thumbnail.save(os.path.join(IMAGES_PATH, f'{image_id}/thumbnail.jpg'))
+    thumbnail.save(os.path.join(IMAGES_PATH, f'{image_id}/thumbnail.jpeg'))
     label = osr.associated_images.get(u'label').convert('RGB')
-    label.save(os.path.join(IMAGES_PATH, f'{image_id}/label.jpg'))
+    label.save(os.path.join(IMAGES_PATH, f'{image_id}/label.jpeg'))
 
     # decode slide id from 2D Data Matrix barcode in label image
     label_data = pylibdmtx.decode(label)
