@@ -76,11 +76,11 @@ Resources:
       AllowedOAuthFlows:
         - code
       SupportedIdentityProviders:
-        - COGNITO
+        # - COGNITO
         - !Ref UserPoolIdentityProvider
       CallbackURLs:
         # The following sentinel value will be replaced by Auth@Edge with the CloudFront domain name (if you let Auth@Edge create the CloudFront distribution)
-        - !Sub https://${DomainName}/parseauth
+        - !Sub https://${DomainName}/
       LogoutURLs:
         # The following sentinel value will be replaced by Auth@Edge with the CloudFront domain name (if you let Auth@Edge create the CloudFront distribution)
         - !Sub https://${DomainName}/
