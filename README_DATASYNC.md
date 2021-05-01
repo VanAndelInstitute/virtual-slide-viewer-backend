@@ -18,6 +18,6 @@ Each AWS account will need its own DataSync agent deployed to the ScanScope work
     - Test network connectivity
 - [Obtain an activation key using the local console](https://docs.aws.amazon.com/datasync/latest/userguide/local-console-vm.html#get-activation-key)
 - Create an agent. Choose “Manually enter your agent’s activation key”
-- Create a location of type SMB for the ScanScope workstation image location
+- Create a location of type SMB for the ScanScope workstation file location
 ---
 You are now ready to deploy the CloudFormation stack for VSV, including the remaining DataSync resources.

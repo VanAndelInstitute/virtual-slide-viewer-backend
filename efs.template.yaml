@@ -16,7 +16,7 @@ Parameters:
     Type: String
     Default: ''
     Description: ID of the source location for image transfers via DataSync
-  ImagesBucketName:
+  ArchiveBucketName:
     Type: String
     Description: A legal bucket name.  Must not exist.
 
@@ -28,6 +28,8 @@ Resources:
       FileSystemTags:
         - Key: Name
           Value: !Sub '${AWS::StackName}'
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_60_DAYS
   EfsSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -107,11 +109,7 @@ Resources:
         LogLevel: 'BASIC'
       # CloudWatchLogGroupArn: !GetAtt DataSyncLogGroup.Arn
       CloudWatchLogGroupArn: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/datasync/${AWS::StackName}
-  ImagesBucket:
-    Type: AWS::S3::Bucket
-    DeletionPolicy: Retain
-    Properties:
-      BucketName: !Ref ImagesBucketName
+
 Outputs:
   FileSystemId:
     Description: 'The ID of the created file system'

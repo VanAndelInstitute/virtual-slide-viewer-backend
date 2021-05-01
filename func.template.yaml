@@ -29,13 +29,16 @@ Parameters:
     Default: prod
   TableName:
     Type: String
-    Description: Slide table for image metadata.
+    Description: Name of DynamoDB table for slide metadata.
   DataSyncTaskArn:
     Type: String
-    Description: ARN of the DataSync task for image transfers from scanner to EFS
-  ImagesBucketName:
+    Description: ARN of the DataSync task for file transfers from scanner to EFS
+  ArchiveBucketName:
     Type: String
-    Description: A legal bucket name.  Must not exist.
+    Description: Name of archive bucket.
+  PublishBucketName:
+    Type: String
+    Description: Name of archive bucket.
 
 Globals:
   Api:
@@ -76,7 +79,7 @@ Resources:
       MemorySize: 640
       Environment:
         Variables:
-          IMAGES_PATH: !Sub '/mnt/${FileSystem}'
+          FS_PATH: !Sub '/mnt/${FileSystem}'
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
@@ -108,7 +111,7 @@ Resources:
       MemorySize: 640
       Environment:
         Variables:
-          IMAGES_PATH: !Sub '/mnt/${FileSystem}'
+          FS_PATH: !Sub '/mnt/${FileSystem}'
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
@@ -144,7 +147,7 @@ Resources:
         MaximumRetryAttempts: 0
       Environment:
         Variables:
-          IMAGES_PATH: !Sub '/mnt/${FileSystem}'
+          FS_PATH: !Sub '/mnt/${FileSystem}'
           TABLE_NAME: !Ref TableName
       Layers:
         - !Ref OpenSlide
@@ -177,7 +180,7 @@ Resources:
         MaximumRetryAttempts: 0
       Environment:
         Variables:
-          IMAGES_PATH: !Sub '/mnt/${FileSystem}'
+          FS_PATH: !Sub '/mnt/${FileSystem}'
       Policies:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref FileSystem
@@ -233,17 +236,17 @@ Resources:
             RestApiId: !Ref ImagesApi
             Path: /ImportSlide
             Method: POST
-  DeleteImageAsync:
+  DeleteFileAsync:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/RemoveImages
-      Handler: deleteimageasync.lambda_handler
+      CodeUri: functions/ManageFiles
+      Handler: deletefileasync.lambda_handler
       Runtime: python3.8
       Timeout: 900
       AutoPublishAlias: live
       Environment:
         Variables:
-          IMAGES_PATH: !Sub '/mnt/${FileSystem}'
+          FS_PATH: !Sub '/mnt/${FileSystem}'
       Policies:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref FileSystem
@@ -255,11 +258,11 @@ Resources:
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
             LocalMountPath: !Sub '/mnt/${FileSystem}'
-  TransferImageAsync:
+  BackupFileAsync:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/RemoveImages
-      Handler: transferimageasync.lambda_handler
+      CodeUri: functions/ManageFiles
+      Handler: backupfileasync.lambda_handler
       Runtime: python3.8
       Timeout: 900
       MemorySize: 1536
@@ -267,8 +270,8 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
-          IMAGES_PATH: !Sub '/mnt/${FileSystem}'
-          IMAGES_BUCKET: !Ref ImagesBucketName
+          FS_PATH: !Sub '/mnt/${FileSystem}'
+          ARCHIVE_BUCKET: !Ref ArchiveBucketName
       Policies:
         - EFSWriteAccessPolicy:
             FileSystem: !Ref FileSystem
@@ -276,7 +279,7 @@ Resources:
         - DynamoDBWritePolicy:
             TableName: !Ref TableName
         - S3WritePolicy:
-            BucketName: !Ref ImagesBucketName
+            BucketName: !Ref ArchiveBucketName
       VpcConfig:
         SecurityGroupIds:
           - Ref: LambdaSecurityGroup
@@ -284,32 +287,49 @@ Resources:
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
             LocalMountPath: !Sub '/mnt/${FileSystem}'
-  RemoveImages:
+  ManageFiles:
     Type: AWS::Serverless::Function
     DependsOn:
-      - DeleteImageAsync
-      - TransferImageAsync
+      - DeleteFileAsync
+      - BackupFileAsync
     Properties:
-      CodeUri: functions/RemoveImages
-      Handler: removeimages.lambda_handler
+      CodeUri: functions/ManageFiles
+      Handler: managefiles.lambda_handler
       Runtime: python3.8
       Timeout: 15
       Environment:
         Variables:
-          TRANSFER_FUNCTION: !Ref TransferImageAsync.Alias
-          DELETE_FUNCTION: !Ref DeleteImageAsync.Alias
+          BACKUP_FUNCTION: !Ref BackupFileAsync.Alias
+          DELETE_FUNCTION: !Ref DeleteFileAsync.Alias
       Policies:
         - LambdaInvokePolicy:
-            FunctionName: !Ref TransferImageAsync
+            FunctionName: !Ref BackupFileAsync
         - LambdaInvokePolicy:
-            FunctionName: !Ref DeleteImageAsync
+            FunctionName: !Ref DeleteFileAsync
       Events:
         ImagesApi:
           Type: Api
           Properties:
             RestApiId: !Ref ImagesApi
-            Path: /RemoveImages
-            Method: DELETE
+            Path: /ManageFiles
+            Method: PUT
+  PublishSlide:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/PublishSlide
+      Handler: publishslide.lambda_handler
+      Runtime: python3.8
+      Timeout: 15
+      AutoPublishAlias: live
+      Environment:
+        Variables:
+          ARCHIVE_BUCKET: !Ref ArchiveBucketName
+          PUBLISH_BUCKET: !Ref PublishBucketName
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref ArchiveBucketName
+        - S3WritePolicy:
+            BucketName: !Ref PublishBucketName
   DynamoDbEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -350,7 +370,7 @@ Resources:
             Action:
               - 's3:PutObject'
             Resource:
-              - !Sub 'arn:${AWS::Partition}:s3:::${ImagesBucketName}/*'
+              - !Sub 'arn:${AWS::Partition}:s3:::${ArchiveBucketName}/*'
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
       VpcEndpointType: Gateway
       RouteTableIds:

@@ -93,7 +93,7 @@ Resources:
             TargetOriginId: API
             ViewerProtocolPolicy: redirect-to-https
             AllowedMethods: [GET,HEAD,OPTIONS,PUT,POST,PATCH,DELETE]
-          - PathPattern: /RemoveImages
+          - PathPattern: /ManageFiles
             Compress: true
             ForwardedValues:
               QueryString: true

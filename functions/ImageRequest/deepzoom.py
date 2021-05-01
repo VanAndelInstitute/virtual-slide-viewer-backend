@@ -16,7 +16,7 @@ DEEPZOOM_TILE_SIZE_DEFAULT = 720
 DEEPZOOM_OVERLAP_DEFAULT = 0
 DEEPZOOM_FORMAT_DEFAULT = 'jpeg'
 DEEPZOOM_TILE_QUALITY = 70
-IMAGES_PATH = os.environ.get('IMAGES_PATH', '/tmp')
+FS_PATH = os.environ.get('FS_PATH', '/tmp')
 
 class Object(object):
     pass
@@ -30,7 +30,7 @@ def load_slide(image_id, tile_size=None, overlap=None, _format=None):
     overlap = overlap if overlap is not None else DEEPZOOM_OVERLAP_DEFAULT
     _format = _format or DEEPZOOM_FORMAT_DEFAULT
     slide = Object()
-    slide.osr = openslide.open_slide(os.path.join(IMAGES_PATH, f'{image_id}.svs'))
+    slide.osr = openslide.open_slide(os.path.join(FS_PATH, f'{image_id}.svs'))
     slide.dz = DeepZoomGenerator(slide.osr, tile_size, overlap)
     open_slides[image_id] = slide
     return slide
@@ -85,7 +85,7 @@ def lambda_handler(event, context):
             return respond(dzi, content_type='application/xml')
         elif is_associated_image_request:
             _format = match.group('format')
-            file_path = os.path.join(IMAGES_PATH, image_path).replace('_files/', '/', 1)
+            file_path = os.path.join(FS_PATH, image_path).replace('_files/', '/', 1)
             if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
                 with open(file_path, 'rb') as f:
                     result = f.read()
