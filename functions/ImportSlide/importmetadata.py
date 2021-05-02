@@ -16,7 +16,7 @@ PROPERTY_NAME_APERIO_TZ = u'aperio.Time Zone'
 PROPERTY_NAME_APERIO_MPP = u'aperio.MPP'
 PROPERTY_NAME_APERIO_APPMAG = u'aperio.AppMag'
 
-IMAGES_PATH = os.environ.get('IMAGES_PATH', '/tmp')
+FS_PATH = os.environ.get('FS_PATH', '/tmp')
 TABLE_NAME = os.environ.get('TABLE_NAME')
 
 dynamodb = boto3.resource('dynamodb')
@@ -24,18 +24,18 @@ slide_table = dynamodb.Table(TABLE_NAME)
 
 def lambda_handler(event, context):
     image_filename = event['filename']
-    osr = openslide.open_slide(os.path.join(IMAGES_PATH, image_filename))
+    osr = openslide.open_slide(os.path.join(FS_PATH, image_filename))
     
     # get image id from tiff tags; create output folder
     image_id = osr.properties.get(PROPERTY_NAME_APERIO_IMAGEID)
     
     # Extract label and thumbnail images
-    imagedir = os.path.join(IMAGES_PATH, f'{image_id}/')
+    imagedir = os.path.join(FS_PATH, f'{image_id}/')
     os.makedirs(imagedir, exist_ok=True)
     thumbnail = osr.associated_images.get(u'thumbnail').convert('RGB')
-    thumbnail.save(os.path.join(IMAGES_PATH, f'{image_id}/thumbnail.jpeg'))
+    thumbnail.save(os.path.join(FS_PATH, f'{image_id}/thumbnail.jpeg'))
     label = osr.associated_images.get(u'label').convert('RGB')
-    label.save(os.path.join(IMAGES_PATH, f'{image_id}/label.jpeg'))
+    label.save(os.path.join(FS_PATH, f'{image_id}/label.jpeg'))
 
     # decode slide id from 2D Data Matrix barcode in label image
     label_data = pylibdmtx.decode(label)

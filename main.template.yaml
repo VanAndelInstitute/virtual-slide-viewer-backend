@@ -32,7 +32,7 @@ Metadata:
       EnvType:
         default: Environment type
       SourceLocationId:
-        default: ID of the source location for image transfers via DataSync
+        default: ID of the source location for file transfers via DataSync
       SupportsConfig:
         default: Use AWS Config
       AvailabilityZones:
@@ -77,7 +77,7 @@ Parameters:
     Description: ARN of the SSL certificate for the DomainName
   SourceLocationId:
     Type: String
-    Description: ID of the source location for image transfers via DataSync
+    Description: ID of the source location for file transfers via DataSync
   SupportsConfig:
     Description: Is AWS Config Rules already configured for this region? Use ''false''
       if you are uncertain. See AWS Config Management Console or Deployment Guide
@@ -113,7 +113,9 @@ Parameters:
     Default: dummy
   OIDCIssuerURL:
     Type: String
-  ImagesBucketName:
+  ArchiveBucketName:
+    Type: String
+  PublishBucketName:
     Type: String
   CIDR:
     Description: CIDR block for  VPC
@@ -163,7 +165,7 @@ Resources:
         VpcId: !GetAtt [VpcTemplate, Outputs.VpcId]
         Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
         SourceLocationId: !Ref SourceLocationId
-        ImagesBucketName: !Ref ImagesBucketName
+        ArchiveBucketName: !Ref ArchiveBucketName
   AuthTemplate:
     Type: AWS::Serverless::Application
     Properties:
@@ -206,7 +208,8 @@ Resources:
         EnvType: !Ref EnvType
         TableName: !GetAtt [DbTemplate, Outputs.TableName]
         DataSyncTaskArn: !GetAtt [EfsTemplate, Outputs.DataSyncTaskArn]
-        ImagesBucketName: !Ref ImagesBucketName
+        ArchiveBucketName: !Ref ArchiveBucketName
+        PublishBucketName: !Ref PublishBucketName
   WebTemplate:
     Type: AWS::Serverless::Application
     DependsOn:

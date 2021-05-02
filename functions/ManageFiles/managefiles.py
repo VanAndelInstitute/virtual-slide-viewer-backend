@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 import json
 
-TRANSFER_FUNCTION = os.environ.get('TRANSFER_FUNCTION')
+BACKUP_FUNCTION = os.environ.get('BACKUP_FUNCTION')
 DELETE_FUNCTION = os.environ.get('DELETE_FUNCTION')
 lambda_client = boto3.client('lambda')
 
@@ -33,11 +33,11 @@ def respond(success, error=None, status=200):
     return response
 
 def lambda_handler(event, context):
-    """ Transfer or delete image files."""
+    """ Handle image file operation by invoking child function within VPC."""
     body = json.loads(event['body'])
     op = body['Operation']
-    if op.startswith('TRANSFER'):
-        functionName = TRANSFER_FUNCTION
+    if op.startswith('BACKUP'):
+        functionName = BACKUP_FUNCTION
     elif op.startswith('DELETE'):
         functionName = DELETE_FUNCTION
     else:

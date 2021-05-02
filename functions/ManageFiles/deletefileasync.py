@@ -5,11 +5,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-IMAGES_PATH = os.environ.get('IMAGES_PATH', '/tmp')
+FS_PATH = os.environ.get('FS_PATH', '/tmp')
 
 def lambda_handler(event, context):
     """ Delete image files."""
-    os.chdir(IMAGES_PATH)
+    os.chdir(FS_PATH)
     os.remove(event['Filename'])
     image_id = event['ImageID']
     os.remove(f'{image_id}.dzi')

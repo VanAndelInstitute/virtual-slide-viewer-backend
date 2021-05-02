@@ -5,11 +5,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-IMAGES_PATH = os.environ.get('IMAGES_PATH', '/tmp')
+FS_PATH = os.environ.get('FS_PATH', '/tmp')
 ENV_TYPE = os.environ.get('ENV_TYPE', 'dev')
 
 def lambda_handler(event, context):
-    file_path = os.path.join(IMAGES_PATH, event['filename'])
+    file_path = os.path.join(FS_PATH, event['filename'])
     if os.path.exists(file_path):
         # file transfer has started/occurred
         if os.path.getsize(file_path) == event['size']:

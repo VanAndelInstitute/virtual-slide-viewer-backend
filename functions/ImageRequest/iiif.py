@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-IMAGES_PATH = os.environ.get('IMAGES_PATH', '/tmp')
+FS_PATH = os.environ.get('FS_PATH', '/tmp')
 TILE_SIZE = 720
 TILE_QUALITY = 70
 
@@ -22,7 +22,7 @@ def load_slide(image_id):
     if image_id in open_slides:
         return open_slides[image_id]
 
-    osr = open_slides[image_id] = openslide.open_slide(os.path.join(IMAGES_PATH, f'{image_id}.svs'))
+    osr = open_slides[image_id] = openslide.open_slide(os.path.join(FS_PATH, f'{image_id}.svs'))
     return osr
 
 def get_info(image_id):
@@ -86,7 +86,7 @@ def lambda_handler(event, context):
         if is_info_request:
             return respond(get_info(image_id), content_type='application/json')
         elif is_associated_image_request:
-            file_path = os.path.join(IMAGES_PATH, image_path)
+            file_path = os.path.join(FS_PATH, image_path)
             _format = 'jpeg'
             if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
                 with open(file_path, 'rb') as f:
