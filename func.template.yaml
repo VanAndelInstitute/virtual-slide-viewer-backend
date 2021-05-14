@@ -313,11 +313,11 @@ Resources:
             RestApiId: !Ref ImagesApi
             Path: /ManageFiles
             Method: PUT
-  PublishSlide:
+  PublishSlides:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/PublishSlide
-      Handler: publishslide.lambda_handler
+      CodeUri: functions/PublishSlides
+      Handler: publishslides.lambda_handler
       Runtime: python3.8
       Timeout: 15
       AutoPublishAlias: live
@@ -330,6 +330,13 @@ Resources:
             BucketName: !Ref ArchiveBucketName
         - S3WritePolicy:
             BucketName: !Ref PublishBucketName
+      Events:
+        ImagesApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ImagesApi
+            Path: /PublishSlides
+            Method: PUT
   DynamoDbEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
