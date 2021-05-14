@@ -69,8 +69,8 @@ def respond(success, error=None, status=200, content_type=None):
     return response
 
 def lambda_handler(event, context):
-    """ Handler for individual DeepZoom protocol requests.
-        Returns: one DeepZoom tile OR a DeepZoom info (dzi) xml document."""
+    """ Handler for individual IIIF protocol requests.
+        Returns: one IIIF tile OR a IIIF info (dzi) xml document."""
     try:
         image_path = event['pathParameters']['imagePath']
         logger.info(image_path)

@@ -1,6 +1,5 @@
 # Backend for Virtual Slide Viewer
-The VSV backend is implemented as an AWS Serverless application. It mounts an EFS share with SVS files into a Lambda function and handles API Gateway requests
-for DeepZoom tiles by using [OpenSlide Python](https://openslide.org/api/python/) to fetch TIFF tiles and [Pillow-SIMD](https://github.com/uploadcare/pillow-simd) to shrink tiles as needed.
+The VSV backend is implemented as an AWS Serverless application. It mounts an EFS share with SVS files into a Lambda function and handles API Gateway requests for [IIIF](https://iiif.io/api/image/3.0/) tiles by using [OpenSlide Python](https://openslide.org/api/python/) to fetch TIFF tiles and [Pillow-SIMD](https://github.com/uploadcare/pillow-simd) to shrink tiles as needed.
 
 ## Build and deploy
 
@@ -43,7 +42,6 @@ $ sudo chgrp -R ec2-user .
     - extracts label and thumbnail images from SVS file
     - extracts slide metadata from TIFF tags and reads barcode from label image
     - uploads metadata to Amazon DynamoDB table
-    - extracts DeepZoom tiles from SVS file and stores them as JPEGs in EFS
 1.	**Scanner technician reviews slides for scanning errors**
     - searches for new (unsent) slides
     - deletes and rescans failed slide scans
