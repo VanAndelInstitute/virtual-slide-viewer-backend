@@ -1,6 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'DynamoDB Table resources for Virtual Slide Viewer'
 Parameters:
+  StackName:
+    Description: Name of the parent of this nested stack.
+    Type: String
   EnvType:
     Description: Runtime environment type.
     Default: dev
@@ -61,7 +64,7 @@ Resources:
   GraphQLApi:
     Type: AWS::AppSync::GraphQLApi
     Properties: 
-      Name: !Ref AWS::StackName
+      Name: !Ref StackName
       AuthenticationType: AMAZON_COGNITO_USER_POOLS
       UserPoolConfig:
         AwsRegion: !Sub ${AWS::Region}
@@ -141,7 +144,7 @@ Resources:
       Definition: |-
           type Mutation {
             updateSlide(input: UpdateSlideInput!): Slide
-              @aws_auth(cognito_groups: ["Technicians"])
+            @aws_auth(cognito_groups: ["Admins"])
           }
 
           type Query {

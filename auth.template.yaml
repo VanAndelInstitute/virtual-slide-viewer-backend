@@ -6,6 +6,9 @@ Transform: AWS::Serverless-2016-10-31
 Description: 'Cognito resources for Virtual Slide Viewer'
 
 Parameters:
+  StackName:
+    Description: Name of the parent of this nested stack.
+    Type: String
   FromEmailAddress:
     Type: String
   FromEmailName:
@@ -32,7 +35,7 @@ Resources:
   UserPool:
     Type: AWS::Cognito::UserPool
     Properties:
-      UserPoolName: !Ref AWS::StackName
+      UserPoolName: !Ref StackName
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
       UsernameAttributes:
@@ -89,21 +92,24 @@ Resources:
     Properties:
       UserPoolId: !Ref UserPool
       Domain: !Ref AuthDomainPrefix
-  TechniciansGroup:
+  AdminsGroup:
     Type: AWS::Cognito::UserPoolGroup
     Properties: 
       Description: Users with write access to the data
-      GroupName: Technicians
+      GroupName: Admins
       UserPoolId: !Ref UserPool
 
 Outputs:
   UserPoolId:
-    Description: The ID of the created user pool
+    Description: The ID of the Cognito user pool
     Value: !Ref UserPool
   UserPoolArn:
-    Description: The ARN of the created user pool
+    Description: The ARN of the Cognito user pool
     Value: !GetAtt UserPool.Arn
   UserPoolClientId:
-    Description: The ID of the created user pool client
+    Description: The ID of the Cognito user pool client
     Value: !Ref UserPoolClient
+  IdentityPoolId:
+    Description: The ID of the Cognito identity pool
+    Value: !Ref IdentityPool
   

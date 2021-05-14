@@ -142,6 +142,7 @@ Resources:
     Properties:
       Location: vpc.template.yaml
       Parameters:
+        StackName: !Ref AWS::StackName
         EnvType: !Ref EnvType
         RegionAZ1Name:
           !Select
@@ -161,6 +162,7 @@ Resources:
     Properties:
       Location: efs.template.yaml
       Parameters:
+        StackName: !Ref AWS::StackName
         EnvType: !Ref EnvType
         VpcId: !GetAtt [VpcTemplate, Outputs.VpcId]
         Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
@@ -187,6 +189,7 @@ Resources:
     Properties:
       Location: db.template.yaml
       Parameters:
+        StackName: !Ref AWS::StackName
         EnvType: !Ref EnvType
         UserPoolId: !GetAtt [AuthTemplate, Outputs.UserPoolId]
   FuncTemplate:
@@ -198,6 +201,7 @@ Resources:
     Properties:
       Location: template.yaml
       Parameters:
+        StackName: !Ref AWS::StackName
         VpcId: !GetAtt [VpcTemplate, Outputs.VpcId]
         RouteTableId: !GetAtt [VpcTemplate, Outputs.RouteTableId]
         Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]

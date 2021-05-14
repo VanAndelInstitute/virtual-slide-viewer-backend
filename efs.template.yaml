@@ -2,6 +2,9 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: 'EFS resources for Virtual Slide Viewer'
 Parameters:
+  StackName:
+    Description: Name of the parent of this nested stack.
+    Type: String
   VpcId:
     Type: String
     Description: 'ID of your existing Virtual Private Cloud (VPC)'
@@ -27,7 +30,7 @@ Resources:
     Properties:
       FileSystemTags:
         - Key: Name
-          Value: !Sub '${AWS::StackName}'
+          Value: !Ref StackName
       LifecyclePolicies:
         - TransitionToIA: AFTER_60_DAYS
   EfsSecurityGroup:
@@ -94,7 +97,7 @@ Resources:
   DataSyncLogGroup: 
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub '/aws/datasync/${AWS::StackName}'
+      LogGroupName: !Sub '/aws/datasync/${StackName}'
       RetentionInDays: 60
   DataSyncTask:
     Type: AWS::DataSync::Task
@@ -108,7 +111,7 @@ Resources:
         PreserveDeletedFiles: 'PRESERVE'
         LogLevel: 'BASIC'
       # CloudWatchLogGroupArn: !GetAtt DataSyncLogGroup.Arn
-      CloudWatchLogGroupArn: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/datasync/${AWS::StackName}
+      CloudWatchLogGroupArn: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/datasync/${StackName}
 
 Outputs:
   FileSystemId:
