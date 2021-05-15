@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 FS_PATH = os.environ.get('FS_PATH', '/tmp')
+API_PATH = os.environ.get('API_PATH')
 TILE_SIZE = 720
 TILE_QUALITY = 70
 
@@ -31,7 +32,7 @@ def get_info(image_id):
     downsamples = list(map(lambda d: round(d), osr.level_downsamples))
     info =   {
         "@context": "http://iiif.io/api/image/2/context.json",
-        "@id": "/image-service/" + image_id,
+        "@id": urljoin(API_PATH, image_id),
         "type": "ImageService3",
         "protocol": "http://iiif.io/api/image",
         "profile": [ "http://iiif.io/api/image/2/level2.json" ],
@@ -76,23 +77,26 @@ def lambda_handler(event, context):
         logger.info(image_path)
         # 1001610/info.json
         # 1001610/0,0,2880,2880/720,/0/default.jpg
-        match = re.match(r'(?P<image_id>\w+)/((?P<info>info\.json)|(?P<assoc>(thumbnail|label)\.jpeg)|(?P<region>\d+,\d+,\d+,\d+)/(?P<size>\d*,\d*)/(?P<rotation>\d{1,3})/(?P<quality>color|gray|bitonal|default)\.(?P<format>jpg|tif|png|gif|jp2|pdf|webp))', image_path)
+        match = re.match(r'(?P<image_id>\w+)/((?P<info>(info|properties)\.json)|(?P<assoc>(thumbnail|label)\.jpeg)|(?P<region>\d+,\d+,\d+,\d+)/(?P<size>\d*,\d*)/(?P<rotation>\d{1,3})/(?P<quality>color|gray|bitonal|default)\.(?P<format>jpg|tif|png|gif|jp2|pdf|webp))', image_path)
         if not match:
             raise ValueError(f'Bad resource request: {image_path}')
 
         image_id = match.group('image_id')
-        is_info_request = bool(match.group('info'))
-        is_associated_image_request = bool(match.group('assoc'))
-        if is_info_request:
+        info_request_type = match.group('info')
+        assoc_request_type = match.group('assoc')
+        if info_request_type == 'info.json':
             return respond(get_info(image_id), content_type='application/json')
-        elif is_associated_image_request:
+        elif info_request_type == 'properties.json':
+            osr = load_slide(image_id)
+            return respond(json.dumps(dict(osr.properties)), content_type='application/json')
+        elif bool(assoc_request_type):
             file_path = os.path.join(FS_PATH, image_path)
             _format = 'jpeg'
             if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
                 with open(file_path, 'rb') as f:
                     result = f.read()
             else:
-                name = match.group('assoc')
+                name = assoc_request_type
                 osr = load_slide(image_id)
                 image = osr.associated_images.get(name).convert('RGB')
                 buf = BytesIO()

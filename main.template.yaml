@@ -66,12 +66,9 @@ Parameters:
   DomainName:
     Type: String
     Description: Custom FQDN of CloudFront distribution
-  HostedZoneDomainName:
+  HostedZoneName:
     Type: String
-    Description: hosted zone domain name
-  HostedZoneId:
-    Type: String
-    Description: hosted zone ID
+    Description: Name of the Route 53 hosted zone
   ViewerCertificateArn:
     Type: String
     Description: ARN of the SSL certificate for the DomainName
@@ -133,6 +130,12 @@ Parameters:
     Type: String
     Description: File system id of EfsFileSystem
     Default: ""
+  ApiCustomDomain:
+    Type: String
+    Description: Custom domain for the API endpoint. Be sure to include the trailing dot.
+  ApiCertificateArn:
+    Type: String
+    Description: ARN of the SSL certificate for the API domain name
 
 Conditions:
   LoadConfigRulesTemplate: !Equals [!Ref SupportsConfig, 'true']
@@ -217,6 +220,9 @@ Resources:
         DataSyncTaskArn: !GetAtt [EfsTemplate, Outputs.DataSyncTaskArn]
         ArchiveBucketName: !Ref ArchiveBucketName
         PublishBucketName: !Ref PublishBucketName
+        ApiCustomDomain: !Ref ApiCustomDomain
+        HostedZoneName: !Ref HostedZoneName
+        ApiCertificateArn: !Ref ApiCertificateArn
   WebTemplate:
     Type: AWS::Serverless::Application
     DependsOn:
@@ -225,11 +231,10 @@ Resources:
       Location: web.template.yaml
       Parameters:
         EnvType: !Ref EnvType
-        ApiDomain: !GetAtt [FuncTemplate, Outputs.ApiDomain]
         AppBucketName: !Ref AppBucketName
         DomainName: !Ref DomainName
-        HostedZoneId: !Ref HostedZoneId
-        HostedZoneDomainName: !Ref HostedZoneDomainName
+        HostedZoneName: !Ref HostedZoneName
+        HostedZoneName: !Ref HostedZoneName
         ViewerCertificateArn: !Ref ViewerCertificateArn
 Outputs:
   DynamoDbTableName:

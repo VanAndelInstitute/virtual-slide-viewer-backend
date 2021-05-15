@@ -42,6 +42,15 @@ Parameters:
   PublishBucketName:
     Type: String
     Description: Name of archive bucket.
+  ApiCustomDomain:
+    Type: String
+    Description: Custom domain for the API endpoint
+  HostedZoneName:
+    Type: String
+    Description: Name of the Route 53 hosted zone
+  ApiCertificateArn:
+    Type: String
+    Description: ARN of the SSL certificate for the API domain name
 
 Globals:
   Api:
@@ -85,6 +94,7 @@ Resources:
       Environment:
         Variables:
           FS_PATH: !Sub '/mnt/${FileSystemId}'
+          API_PATH: !Sub https://${ApiCustomDomain}/${EnvType}/image-service/
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
@@ -437,13 +447,19 @@ Resources:
       BinaryMediaTypes: ['image/*']
       EndpointConfiguration:
         Type: REGIONAL
+      Domain:
+        DomainName: !Ref ApiCustomDomain
+        CertificateArn: !Ref ApiCertificateArn
+        EndpointConfiguration: REGIONAL
+        Route53:
+          HostedZoneName: !Ref HostedZoneName
+        BasePath:
+          - !Ref EnvType
+
 Outputs:
   ApiId:
     Description: Api id of ImagesApi
     Value: !Ref ImagesApi
-  ApiDomain:
-    Description: FQDN of ImagesApi
-    Value: !Sub ${ImagesApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}
   ApiUrl:
     Description: URL of your API endpoint
-    Value: !Sub https://${ImagesApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/${EnvType}/
+    Value: !Sub https://${ApiCustomDomain}/${EnvType}/
