@@ -1,10 +1,10 @@
 build-OpenSlide:
-	yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
-	yum install -y openslide
+	yum install -y git autoconf, automake, libtool, and pkg-config
+	yum install -y libjpeg-turbo-devel openjpeg2-devel libtiff-devel cairo-devel gdk-pixbuf2-devel sqlite-devel libxml2-devel
 	mkdir -p "$(ARTIFACTS_DIR)/lib"
 	cp /usr/lib64/libcairo.so.2 "$(ARTIFACTS_DIR)/lib"
 	cp /usr/lib64/libxml2.so.2 "$(ARTIFACTS_DIR)/lib"
-	cp /usr/lib64/libopenjpeg.so.1 "$(ARTIFACTS_DIR)/lib"
+	cp /usr/lib64/libopenjp2.so.7 "$(ARTIFACTS_DIR)/lib"
 	cp /usr/lib64/libtiff.so.5 "$(ARTIFACTS_DIR)/lib"
 	cp /usr/lib64/libpng15.so.15 "$(ARTIFACTS_DIR)/lib"
 	cp /usr/lib64/libgdk_pixbuf-2.0.so.0 "$(ARTIFACTS_DIR)/lib"
@@ -35,9 +35,12 @@ build-OpenSlide:
 	cp /usr/lib64/libGLdispatch.so.0  "$(ARTIFACTS_DIR)/lib"
 	cp /usr/lib64/libXau.so.6 "$(ARTIFACTS_DIR)/lib"
 	cp /usr/lib64/libGLX.so.0 "$(ARTIFACTS_DIR)/lib"
-	cp /usr/lib64/libopenslide.so.0 "$(ARTIFACTS_DIR)/lib"
+
+	git clone https://github.com/VanAndelInstitute/openslide.git
+	cd openslide \
+	&& autoreconf -i \
+	&& ./configure --prefix=$(ARTIFACTS_DIR) \
+	&& make \
+	&& make install
 	mkdir -p "$(ARTIFACTS_DIR)/python"
 	python -m pip install --no-deps openslide-python -t "$(ARTIFACTS_DIR)/python"
-
-
-# libsqlite3.so.0 => /lib64/libsqlite3.so.0 (0x00007f063d242000)
