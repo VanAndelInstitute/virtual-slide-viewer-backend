@@ -109,7 +109,4 @@ Outputs:
   UserPoolClientId:
     Description: The ID of the Cognito user pool client
     Value: !Ref UserPoolClient
-  IdentityPoolId:
-    Description: The ID of the Cognito identity pool
-    Value: !Ref IdentityPool
   

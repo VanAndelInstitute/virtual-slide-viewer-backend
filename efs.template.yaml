@@ -22,10 +22,17 @@ Parameters:
   ArchiveBucketName:
     Type: String
     Description: A legal bucket name.  Must not exist.
+  FileSystemId:
+    Type: String
+    Description: File system id of EfsFileSystem
+
+Conditions:
+  CreateFS: !Equals [!Ref FileSystemId, ""]
 
 Resources:
   FileSystem:
     Type: AWS::EFS::FileSystem
+    Condition: CreateFS
     DeletionPolicy: Retain
     Properties:
       FileSystemTags:
@@ -36,11 +43,13 @@ Resources:
   EfsSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
+      GroupName: !Sub ${StackName}-EfsSecurityGroup
       GroupDescription: VSV security group for EFS
       VpcId: !Ref VpcId
   DataSyncSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
+      GroupName: !Sub ${StackName}-DataSyncSecurityGroup
       GroupDescription: VSV security group for DataSync
       VpcId: !Ref VpcId
       SecurityGroupEgress:
@@ -59,19 +68,19 @@ Resources:
   MountTargetA:
     Type: AWS::EFS::MountTarget
     Properties:
-      FileSystemId: !Ref FileSystem
+      FileSystemId: !If [CreateFS, !Ref FileSystem, !Ref FileSystemId]
       SubnetId: !Select [ 0, !Ref Subnets ]
       SecurityGroups: [!Ref EfsSecurityGroup]
   MountTargetB:
     Type: AWS::EFS::MountTarget
     Properties:
-      FileSystemId: !Ref FileSystem
+      FileSystemId: !If [CreateFS, !Ref FileSystem, !Ref FileSystemId]
       SubnetId: !Select [ 1, !Ref Subnets ]
       SecurityGroups: [!Ref EfsSecurityGroup]
   AccessPoint:
     Type: AWS::EFS::AccessPoint
     Properties:
-      FileSystemId: !Ref FileSystem
+      FileSystemId: !If [CreateFS, !Ref FileSystem, !Ref FileSystemId]
       PosixUser:
         Gid: '1000'
         Uid: '1000'
@@ -87,7 +96,10 @@ Resources:
       - MountTargetA
     Properties:
       EfsFilesystemArn:
-        !GetAtt FileSystem.Arn
+        !If
+        - CreateFS
+        - !Sub arn:${AWS::Partition}:elasticfilesystem:${AWS::Region}:${AWS::AccountId}:file-system/${FileSystem}
+        - !Sub arn:${AWS::Partition}:elasticfilesystem:${AWS::Region}:${AWS::AccountId}:file-system/${FileSystemId}
       Ec2Config:
         SecurityGroupArns:
           - !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:security-group/${DataSyncSecurityGroup}
@@ -116,7 +128,7 @@ Resources:
 Outputs:
   FileSystemId:
     Description: 'The ID of the created file system'
-    Value: !Ref FileSystem
+    Value: !If [CreateFS, !Ref FileSystem, !Ref FileSystemId]
   AccessPointId:
     Description: 'The ID of the access point created for the file system'
     Value: !Ref AccessPoint

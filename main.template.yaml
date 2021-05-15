@@ -129,12 +129,13 @@ Parameters:
     Description: CIDR block for AZ-1b subnet
     Type: String
     Default: 10.100.20.0/24
+  FileSystemId:
+    Type: String
+    Description: File system id of EfsFileSystem
+    Default: ""
 
 Conditions:
-  LoadConfigRulesTemplate:
-    !Equals
-    - !Ref SupportsConfig
-    - 'true'
+  LoadConfigRulesTemplate: !Equals [!Ref SupportsConfig, 'true']
 
 Resources:
   VpcTemplate:
@@ -168,11 +169,13 @@ Resources:
         Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
         SourceLocationId: !Ref SourceLocationId
         ArchiveBucketName: !Ref ArchiveBucketName
+        FileSystemId: !Ref FileSystemId
   AuthTemplate:
     Type: AWS::Serverless::Application
     Properties:
       Location: auth.template.yaml
       Parameters:
+        StackName: !Ref AWS::StackName
         AuthDomainPrefix: !Ref AuthDomainPrefix
         DomainName: !Ref DomainName
         FromEmailAddress: !Ref FromEmailAddress
@@ -205,7 +208,7 @@ Resources:
         VpcId: !GetAtt [VpcTemplate, Outputs.VpcId]
         RouteTableId: !GetAtt [VpcTemplate, Outputs.RouteTableId]
         Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
-        FileSystem: !GetAtt [EfsTemplate, Outputs.FileSystemId]
+        FileSystemId: !GetAtt [EfsTemplate, Outputs.FileSystemId]
         EfsSecurityGroup: !GetAtt [EfsTemplate, Outputs.EfsSecurityGroupId]
         AccessPointId: !GetAtt [EfsTemplate, Outputs.AccessPointId]
         AccessPointArn: !GetAtt [EfsTemplate, Outputs.AccessPointArn]
@@ -218,7 +221,6 @@ Resources:
     Type: AWS::Serverless::Application
     DependsOn:
       - FuncTemplate
-      - AuthTemplate
     Properties:
       Location: web.template.yaml
       Parameters:
