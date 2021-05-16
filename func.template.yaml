@@ -7,10 +7,10 @@ Parameters:
     Type: String
   VpcId:
     Type: String
-    Description: 'VPC ID to use for DynamoDB gateway endpoint'
+    Description: 'VPC ID to use for S3 gateway endpoint'
   RouteTableId:
     Type: String
-    Description: 'Route Table ID to use for DynamoDB gateway endpoint'
+    Description: 'Route Table ID to use for S3 gateway endpoint'
   Subnets:
     Type: CommaDelimitedList
     Description: 'The list of Subnet IDs, for at least two Availability Zones in the region in your Virtual Private Cloud (VPC)'
@@ -30,18 +30,12 @@ Parameters:
     Type: String
     Description: Runtime environment type.
     Default: prod
-  TableName:
+  SlidesBucketName:
     Type: String
-    Description: Name of DynamoDB table for slide metadata.
-  DataSyncTaskArn:
-    Type: String
-    Description: ARN of the DataSync task for file transfers from scanner to EFS
-  ArchiveBucketName:
-    Type: String
-    Description: Name of archive bucket.
+    Description: Name of the bucket for uploading slides.
   PublishBucketName:
     Type: String
-    Description: Name of archive bucket.
+    Description: Name of the bucket for making slides public.
   ApiCustomDomain:
     Type: String
     Description: Custom domain for the API endpoint
@@ -61,6 +55,11 @@ Globals:
         ENV_TYPE: !Ref EnvType
 
 Resources:
+  SlidesBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Ref SlidesBucketName
   LambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -116,150 +115,45 @@ Resources:
             RestApiId: !Ref ImagesApi
             Path: /image-service/{imagePath+}
             Method: GET
-  DeepZoom:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub ${StackName}-DeepZoom
-      CodeUri: functions/ImageRequest
-      Handler: deepzoom.lambda_handler
-      Runtime: python3.8
-      Timeout: 15
-      MemorySize: 640
-      Environment:
-        Variables:
-          FS_PATH: !Sub '/mnt/${FileSystemId}'
-      Layers:
-        - !Ref OpenSlide
-        - !Ref PillowSIMD
-      Policies:
-        - EFSWriteAccessPolicy:
-            FileSystem: !Ref FileSystemId
-            AccessPoint: !Ref AccessPointId
-      VpcConfig:
-        SecurityGroupIds:
-          - Ref: LambdaSecurityGroup
-        SubnetIds: !Ref Subnets
-      FileSystemConfigs:
-          - Arn: !Ref AccessPointArn
-            LocalMountPath: !Sub '/mnt/${FileSystemId}'
-      Events:
-        ImagesApi:
-          Type: Api
-          Properties:
-            RestApiId: !Ref ImagesApi
-            Path: /DeepZoom/{imagePath+}
-            Method: GET
-  ImportMetadata:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub ${StackName}-ImportMetadata
-      CodeUri: functions/ImportSlide
-      Handler: importmetadata.lambda_handler
-      Runtime: python3.8
-      Timeout: 120
-      MemorySize: 1536
-      AutoPublishAlias: live
-      EventInvokeConfig:
-        MaximumEventAgeInSeconds: 180
-        MaximumRetryAttempts: 0
-      Environment:
-        Variables:
-          FS_PATH: !Sub '/mnt/${FileSystemId}'
-          TABLE_NAME: !Ref TableName
-      Layers:
-        - !Ref OpenSlide
-        - !Ref PillowSIMD
-        - !Ref libdmtx
-      Policies:
-        - EFSWriteAccessPolicy:
-            FileSystem: !Ref FileSystemId
-            AccessPoint: !Ref AccessPointId
-        - DynamoDBWritePolicy:
-            TableName: !Ref TableName
-      VpcConfig:
-        SecurityGroupIds:
-          - Ref: LambdaSecurityGroup
-        SubnetIds: !Ref Subnets
-      FileSystemConfigs:
-        - Arn: !Ref AccessPointArn
-          LocalMountPath: !Sub '/mnt/${FileSystemId}'
-  CheckFileTransfer:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub ${StackName}-CheckFileTransfer
-      CodeUri: functions/ImportSlide
-      Handler: checkfiletransfer.lambda_handler
-      Runtime: python3.8
-      Timeout: 3
-      MemorySize: 128
-      AutoPublishAlias: live
-      EventInvokeConfig:
-        MaximumEventAgeInSeconds: 180
-        MaximumRetryAttempts: 0
-      Environment:
-        Variables:
-          FS_PATH: !Sub '/mnt/${FileSystemId}'
-      Policies:
-        - EFSWriteAccessPolicy:
-            FileSystem: !Ref FileSystemId
-            AccessPoint: !Ref AccessPointId
-      VpcConfig:
-        SecurityGroupIds:
-          - Ref: LambdaSecurityGroup
-        SubnetIds: !Ref Subnets
-      FileSystemConfigs:
-          - Arn: !Ref AccessPointArn
-            LocalMountPath: !Sub '/mnt/${FileSystemId}'
   ImportSlide:
     Type: AWS::Serverless::Function
-    DependsOn:
-      - CheckFileTransfer
-      - ImportMetadata
     Properties:
       FunctionName: !Sub ${StackName}-ImportSlide
       CodeUri: functions/ImportSlide
       Handler: importslide.lambda_handler
       Runtime: python3.8
-      Timeout: 29
-      MemorySize: 256
+      Timeout: 120
+      MemorySize: 1536
       EventInvokeConfig:
         MaximumEventAgeInSeconds: 180
         MaximumRetryAttempts: 0
       Environment:
         Variables:
-          TABLE_NAME: !Ref TableName
-          CHECK_FILE_FUNCTION: !Ref CheckFileTransfer.Alias
-          METADATA_FUNCTION: !Ref ImportMetadata.Alias
-          TASK_ARN: !Ref DataSyncTaskArn
+          FS_PATH: !Sub '/mnt/${FileSystemId}'
       Policies:
-        - LambdaInvokePolicy:
-            FunctionName: !Ref ImportMetadata
-        - LambdaInvokePolicy:
-            FunctionName: !Ref CheckFileTransfer
-        - DynamoDBReadPolicy:
-            TableName: !Ref TableName
-        - Statement:
-            - Effect: Allow
-              Action:
-                - datasync:DescribeTask
-                - datasync:StartTaskExecution
-              Resource: !Ref DataSyncTaskArn
-        - Statement:
-            - Effect: Allow
-              Action: ec2:DescribeNetworkInterfaces
-              Resource: '*'
+        - S3ReadPolicy:
+            BucketName: !Ref SlidesBucketName
+        - EFSWriteAccessPolicy:
+            FileSystem: !Ref FileSystemId
+            AccessPoint: !Ref AccessPointId
+      VpcConfig:
+        SecurityGroupIds:
+          - Ref: LambdaSecurityGroup
+        SubnetIds: !Ref Subnets
+      FileSystemConfigs:
+          - Arn: !Ref AccessPointArn
+            LocalMountPath: !Sub '/mnt/${FileSystemId}'
       Events:
-        ImagesApi:
-          Type: Api
+        UploadEvent:
+          Type: S3
           Properties:
-            RestApiId: !Ref ImagesApi
-            Path: /ImportSlide
-            Method: POST
+            Bucket: !Ref SlidesBucket
+            Events: s3:ObjectCreated:*
   DeleteFileAsync:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub ${StackName}-DeleteFileAsync
-      CodeUri: functions/ManageFiles
+      CodeUri: functions/DeleteFiles
       Handler: deletefileasync.lambda_handler
       Runtime: python3.8
       Timeout: 900
@@ -278,54 +172,20 @@ Resources:
       FileSystemConfigs:
           - Arn: !Ref AccessPointArn
             LocalMountPath: !Sub '/mnt/${FileSystemId}'
-  BackupFileAsync:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub ${StackName}-BackupFileAsync
-      CodeUri: functions/ManageFiles
-      Handler: backupfileasync.lambda_handler
-      Runtime: python3.8
-      Timeout: 900
-      MemorySize: 1536
-      AutoPublishAlias: live
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref TableName
-          FS_PATH: !Sub '/mnt/${FileSystemId}'
-          ARCHIVE_BUCKET: !Ref ArchiveBucketName
-      Policies:
-        - EFSWriteAccessPolicy:
-            FileSystem: !Ref FileSystemId
-            AccessPoint: !Ref AccessPointId
-        - DynamoDBWritePolicy:
-            TableName: !Ref TableName
-        - S3WritePolicy:
-            BucketName: !Ref ArchiveBucketName
-      VpcConfig:
-        SecurityGroupIds:
-          - Ref: LambdaSecurityGroup
-        SubnetIds: !Ref Subnets
-      FileSystemConfigs:
-          - Arn: !Ref AccessPointArn
-            LocalMountPath: !Sub '/mnt/${FileSystemId}'
-  ManageFiles:
+  DeleteFiles:
     Type: AWS::Serverless::Function
     DependsOn:
       - DeleteFileAsync
-      - BackupFileAsync
     Properties:
-      FunctionName: !Sub ${StackName}-ManageFiles
-      CodeUri: functions/ManageFiles
-      Handler: managefiles.lambda_handler
+      FunctionName: !Sub ${StackName}-DeleteFiles
+      CodeUri: functions/DeleteFiles
+      Handler: deletefiles.lambda_handler
       Runtime: python3.8
       Timeout: 15
       Environment:
         Variables:
-          BACKUP_FUNCTION: !Ref BackupFileAsync.Alias
           DELETE_FUNCTION: !Ref DeleteFileAsync.Alias
       Policies:
-        - LambdaInvokePolicy:
-            FunctionName: !Ref BackupFileAsync
         - LambdaInvokePolicy:
             FunctionName: !Ref DeleteFileAsync
       Events:
@@ -333,8 +193,8 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref ImagesApi
-            Path: /ManageFiles
-            Method: PUT
+            Path: /Files
+            Method: DELETE
   PublishSlides:
     Type: AWS::Serverless::Function
     Properties:
@@ -343,14 +203,13 @@ Resources:
       Handler: publishslides.lambda_handler
       Runtime: python3.8
       Timeout: 15
-      AutoPublishAlias: live
       Environment:
         Variables:
-          ARCHIVE_BUCKET: !Ref ArchiveBucketName
+          SLIDES_BUCKET: !Ref SlidesBucketName
           PUBLISH_BUCKET: !Ref PublishBucketName
       Policies:
         - S3ReadPolicy:
-            BucketName: !Ref ArchiveBucketName
+            BucketName: !Ref SlidesBucketName
         - S3WritePolicy:
             BucketName: !Ref PublishBucketName
       Events:
@@ -360,35 +219,6 @@ Resources:
             RestApiId: !Ref ImagesApi
             Path: /PublishSlides
             Method: PUT
-  DynamoDbEndpoint:
-    Type: AWS::EC2::VPCEndpoint
-    Properties:
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal: '*'
-            Action:
-              - 'dynamodb:PutItem'
-              - 'dynamodb:UpdateItem'
-              - 'dynamodb:Query'
-            Resource:
-              - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TableName}'
-              - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TableName}/index/*'
-      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
-      VpcEndpointType: Gateway
-      RouteTableIds:
-        - !Ref RouteTableId
-      VpcId: !Ref VpcId
-  LambdaToDynamoDbEgress:
-    Type: AWS::EC2::SecurityGroupEgress
-    Properties:
-      GroupId: !Ref LambdaSecurityGroup
-      IpProtocol: tcp
-      FromPort: 443
-      ToPort: 443
-      DestinationPrefixListId: pl-4ca54025
-      Description: 'Allow access to DynamoDB gateway VPC endpoint.'
   S3Endpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -398,9 +228,9 @@ Resources:
           - Effect: Allow
             Principal: '*'
             Action:
-              - 's3:PutObject'
+              - 's3:GetObject'
             Resource:
-              - !Sub 'arn:${AWS::Partition}:s3:::${ArchiveBucketName}/*'
+              - !Sub 'arn:${AWS::Partition}:s3:::${SlidesBucketName}/*'
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
       VpcEndpointType: Gateway
       RouteTableIds:

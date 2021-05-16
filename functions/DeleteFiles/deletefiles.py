@@ -8,7 +8,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 import json
 
-BACKUP_FUNCTION = os.environ.get('BACKUP_FUNCTION')
 DELETE_FUNCTION = os.environ.get('DELETE_FUNCTION')
 lambda_client = boto3.client('lambda')
 
@@ -35,17 +34,10 @@ def respond(success, error=None, status=200):
 def lambda_handler(event, context):
     """ Handle image file operation by invoking child function within VPC."""
     body = json.loads(event['body'])
-    op = body['Operation']
-    if op.startswith('BACKUP'):
-        functionName = BACKUP_FUNCTION
-    elif op.startswith('DELETE'):
-        functionName = DELETE_FUNCTION
-    else:
-        return
     for image in body['Images']:
         try:
             response = lambda_client.invoke(
-                FunctionName=functionName,
+                FunctionName=DELETE_FUNCTION,
                 InvocationType='Event', # run async b/c of APIG timeout
                 LogType='None',
                 Payload=json.dumps(image)

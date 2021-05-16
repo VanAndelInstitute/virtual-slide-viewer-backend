@@ -15,13 +15,6 @@ Parameters:
     Description: Runtime environment type.
     Default: dev
     Type: String
-  SourceLocationId:
-    Type: String
-    Default: ''
-    Description: ID of the source location for image transfers via DataSync
-  ArchiveBucketName:
-    Type: String
-    Description: A legal bucket name.  Must not exist.
   FileSystemId:
     Type: String
     Description: File system id of EfsFileSystem
@@ -46,25 +39,6 @@ Resources:
       GroupName: !Sub ${StackName}-EfsSecurityGroup
       GroupDescription: VSV security group for EFS
       VpcId: !Ref VpcId
-  DataSyncSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: !Sub ${StackName}-DataSyncSecurityGroup
-      GroupDescription: VSV security group for DataSync
-      VpcId: !Ref VpcId
-      SecurityGroupEgress:
-        - DestinationSecurityGroupId: !Ref EfsSecurityGroup
-          IpProtocol: tcp
-          FromPort: 2049
-          ToPort: 2049
-  EfsFromDataSyncIngress:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      GroupId: !Ref EfsSecurityGroup
-      SourceSecurityGroupId: !Ref DataSyncSecurityGroup
-      IpProtocol: tcp
-      FromPort: 2049
-      ToPort: 2049
   MountTargetA:
     Type: AWS::EFS::MountTarget
     Properties:
@@ -90,40 +64,6 @@ Resources:
           OwnerGid: '1000'
           OwnerUid: '1000'
           Permissions: '755'
-  DataSyncEfsLocation:
-    Type: AWS::DataSync::LocationEFS
-    DependsOn:
-      - MountTargetA
-    Properties:
-      EfsFilesystemArn:
-        !If
-        - CreateFS
-        - !Sub arn:${AWS::Partition}:elasticfilesystem:${AWS::Region}:${AWS::AccountId}:file-system/${FileSystem}
-        - !Sub arn:${AWS::Partition}:elasticfilesystem:${AWS::Region}:${AWS::AccountId}:file-system/${FileSystemId}
-      Ec2Config:
-        SecurityGroupArns:
-          - !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:security-group/${DataSyncSecurityGroup}
-        SubnetArn: !Sub
-          - arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${efsSubnetId}
-          - efsSubnetId: !Select [ 0, !Ref Subnets ]
-  DataSyncLogGroup: 
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub '/aws/datasync/${StackName}'
-      RetentionInDays: 60
-  DataSyncTask:
-    Type: AWS::DataSync::Task
-    Properties:
-      Name: 'Scanner to EFS'
-      SourceLocationArn: !Sub arn:${AWS::Partition}:datasync:${AWS::Region}:${AWS::AccountId}:location/${SourceLocationId}
-      DestinationLocationArn: !Ref DataSyncEfsLocation
-      Options:
-        VerifyMode: 'ONLY_FILES_TRANSFERRED'
-        OverwriteMode: 'ALWAYS'
-        PreserveDeletedFiles: 'PRESERVE'
-        LogLevel: 'BASIC'
-      # CloudWatchLogGroupArn: !GetAtt DataSyncLogGroup.Arn
-      CloudWatchLogGroupArn: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/datasync/${StackName}
 
 Outputs:
   FileSystemId:
@@ -135,9 +75,6 @@ Outputs:
   AccessPointArn:
     Description: 'The ARN of the access point created for the file system'
     Value: !GetAtt AccessPoint.Arn
-  DataSyncTaskArn:
-    Description: ARN of the DataSync task for transferring images from the scanner to EFS
-    Value: !Ref DataSyncTask
   EfsSecurityGroupId:
     Description: 'The ID of the EFS security group'
     Value: !Ref EfsSecurityGroup

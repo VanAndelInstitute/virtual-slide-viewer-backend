@@ -17,10 +17,6 @@ PROPERTY_NAME_APERIO_MPP = u'aperio.MPP'
 PROPERTY_NAME_APERIO_APPMAG = u'aperio.AppMag'
 
 FS_PATH = os.environ.get('FS_PATH', '/tmp')
-TABLE_NAME = os.environ.get('TABLE_NAME')
-
-dynamodb = boto3.resource('dynamodb')
-slide_table = dynamodb.Table(TABLE_NAME)
 
 def lambda_handler(event, context):
     image_filename = event['filename']
@@ -30,23 +26,15 @@ def lambda_handler(event, context):
     image_id = osr.properties.get(PROPERTY_NAME_APERIO_IMAGEID)
     
     # Extract label and thumbnail images
-    imagedir = os.path.join(FS_PATH, f'{image_id}/')
-    os.makedirs(imagedir, exist_ok=True)
-    thumbnail = osr.associated_images.get(u'thumbnail').convert('RGB')
-    thumbnail.save(os.path.join(FS_PATH, f'{image_id}/thumbnail.jpeg'))
     label = osr.associated_images.get(u'label').convert('RGB')
-    label.save(os.path.join(FS_PATH, f'{image_id}/label.jpeg'))
 
     # decode slide id from 2D Data Matrix barcode in label image
     label_data = pylibdmtx.decode(label)
     if len(label_data) != 1:
         logger.error('Bad label data')
-        slide_id = case_id = image_id
-    else:
-        slide_id = label_data[0].data.decode('ascii')
-        # guess at case id
-        last_index = slide_id.rfind('-')
-        case_id = slide_id[0:last_index]
+        return
+
+    slide_id = label_data[0].data.decode('ascii')
 
     # get metadata
     width, height = osr.dimensions
@@ -58,8 +46,6 @@ def lambda_handler(event, context):
         'Filename': image_filename.strip(),
         'ImageID': image_id.strip(),
         'SlideID': slide_id.strip(),
-        'CaseID': case_id.strip(),
-        'Status': 'NEW',
         'width': width,
         'height': height,
         'ScanDate': scandate.isoformat(),
@@ -68,6 +54,5 @@ def lambda_handler(event, context):
         'lastModified': datetime.now(timezone.utc).isoformat(timespec='milliseconds'),
     }
 
-    # DynamoDB - put metadata
-    slide_table.put_item(Item=metadata)
+    # TODO: put metadata
     logger.info(f'Uploaded metadata for {image_filename}')

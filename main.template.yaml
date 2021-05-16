@@ -14,47 +14,18 @@ Metadata:
         Parameters:
         - AvailabilityZones
       - Label:
-          default: Efs template parameters
-        Parameters:
-        - SourceLocationId
-      - Label:
-          default: Auth template parameters
-        Parameters:
-        - FromEmailAddress
-        - FromEmailName
-        - OAuthScopes
-        - AuthDomainPrefix
-      - Label:
           default: Web template parameters
         Parameters:
         - DomainName
     ParameterLabels:
       EnvType:
         default: Environment type
-      SourceLocationId:
-        default: ID of the source location for file transfers via DataSync
       SupportsConfig:
         default: Use AWS Config
       AvailabilityZones:
         default: Availability zones
-      FromEmailAddress:
-        default: For Cognito Email configuration
-      FromEmailName:
-        default: For Cognito Email configuration
-      OAuthScopes:
-        default: The OAuth scopes to request the User Pool to add to the access token JWT
-      AuthDomainPrefix:
-        default: A custom prefix to use for the sign-up and sign-in pages that are hosted by Amazon Cognito
       DomainName:
         default: Custom FQDN of CloudFront distribution
-      OIDCProviderName:
-        default: A name for the OIDC provider configuration
-      OIDCClientId:
-        default: Client ID from OIDC provider
-      OIDCClientSecret:
-        default: Client secret from OIDC provider
-      OIDCIssuerURL:
-        default: Issuer URL from OIDC provider
 Parameters:
   EnvType:
     Description: Runtime environment type.
@@ -72,9 +43,6 @@ Parameters:
   ViewerCertificateArn:
     Type: String
     Description: ARN of the SSL certificate for the DomainName
-  SourceLocationId:
-    Type: String
-    Description: ID of the source location for file transfers via DataSync
   SupportsConfig:
     Description: Is AWS Config Rules already configured for this region? Use ''false''
       if you are uncertain. See AWS Config Management Console or Deployment Guide
@@ -88,29 +56,7 @@ Parameters:
     Description: Availability Zones
     Type: CommaDelimitedList
     Default: us-east-2a, us-east-2b
-  FromEmailAddress:
-    Type: String
-  FromEmailName:
-    Type: String
-    Default: 'Virtual Slide Viewer'
-  OAuthScopes:
-    Type: String
-    Description: The OAuth scopes to request the User Pool to add to the access token JWT
-    Default: "phone, email, profile, openid, aws.cognito.signin.user.admin"
-  AuthDomainPrefix:
-    Type: String
-    Description: A custom prefix to use for the sign-up and sign-in pages that are hosted by Amazon Cognito
-  OIDCProviderName:
-    Type: String
-  OIDCClientId:
-    Type: String
-    Default: dummy
-  OIDCClientSecret:
-    Type: String
-    Default: dummy
-  OIDCIssuerURL:
-    Type: String
-  ArchiveBucketName:
+  SlidesBucketName:
     Type: String
   PublishBucketName:
     Type: String
@@ -170,40 +116,12 @@ Resources:
         EnvType: !Ref EnvType
         VpcId: !GetAtt [VpcTemplate, Outputs.VpcId]
         Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
-        SourceLocationId: !Ref SourceLocationId
-        ArchiveBucketName: !Ref ArchiveBucketName
         FileSystemId: !Ref FileSystemId
-  AuthTemplate:
-    Type: AWS::Serverless::Application
-    Properties:
-      Location: auth.template.yaml
-      Parameters:
-        StackName: !Ref AWS::StackName
-        AuthDomainPrefix: !Ref AuthDomainPrefix
-        DomainName: !Ref DomainName
-        FromEmailAddress: !Ref FromEmailAddress
-        FromEmailName: !Ref FromEmailName
-        OAuthScopes: !Ref OAuthScopes
-        OIDCClientId: !Ref OIDCClientId
-        OIDCClientSecret: !Ref OIDCClientSecret
-        OIDCIssuerURL: !Ref OIDCIssuerURL
-        OIDCProviderName: !Ref OIDCProviderName
-  DbTemplate:
-    Type: AWS::Serverless::Application
-    DependsOn:
-      - AuthTemplate
-    Properties:
-      Location: db.template.yaml
-      Parameters:
-        StackName: !Ref AWS::StackName
-        EnvType: !Ref EnvType
-        UserPoolId: !GetAtt [AuthTemplate, Outputs.UserPoolId]
   FuncTemplate:
     Type: AWS::Serverless::Application
     DependsOn:
       - VpcTemplate
       - EfsTemplate
-      - DbTemplate
     Properties:
       Location: template.yaml
       Parameters:
@@ -216,9 +134,7 @@ Resources:
         AccessPointId: !GetAtt [EfsTemplate, Outputs.AccessPointId]
         AccessPointArn: !GetAtt [EfsTemplate, Outputs.AccessPointArn]
         EnvType: !Ref EnvType
-        TableName: !GetAtt [DbTemplate, Outputs.TableName]
-        DataSyncTaskArn: !GetAtt [EfsTemplate, Outputs.DataSyncTaskArn]
-        ArchiveBucketName: !Ref ArchiveBucketName
+        SlidesBucketName: !Ref SlidesBucketName
         PublishBucketName: !Ref PublishBucketName
         ApiCustomDomain: !Ref ApiCustomDomain
         HostedZoneName: !Ref HostedZoneName
@@ -237,17 +153,7 @@ Resources:
         HostedZoneName: !Ref HostedZoneName
         ViewerCertificateArn: !Ref ViewerCertificateArn
 Outputs:
-  DynamoDbTableName:
-    Value: !GetAtt [DbTemplate, Outputs.TableName]
   ApiUrl:
     Value: !GetAtt [FuncTemplate, Outputs.ApiUrl]
   region:
     Value: !Sub ${AWS::Region}
-  AuthUserPoolId:
-    Value: !GetAtt [AuthTemplate, Outputs.UserPoolId]
-  AuthUserPoolWebClientId:
-    Value: !GetAtt [AuthTemplate, Outputs.UserPoolClientId]
-  AppsyncGraphqlEndpoint:
-    Value: !GetAtt [DbTemplate, Outputs.ApiUrl]
-  AppsyncAuthenticationType:
-    Value: AMAZON_COGNITO_USER_POOLS
