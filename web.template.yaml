@@ -6,10 +6,6 @@ Description: >
   domain will also require adding a certificate to the Cloudfront Distribution. This alternative will set the User Pool client to the right Callback URL
   and Sign out URL automatically.
 Parameters:
-  EnvType:
-    Description: Runtime environment type.
-    Default: dev
-    Type: String
   AppBucketName:
     Type: String
     Description: A legal bucket name.  Must not exist.

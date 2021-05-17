@@ -7,7 +7,6 @@ Metadata:
       - Label:
           default: General parameters
         Parameters:
-        - EnvType
         - SupportsConfig
       - Label:
           default: VPC template parameters
@@ -18,8 +17,6 @@ Metadata:
         Parameters:
         - DomainName
     ParameterLabels:
-      EnvType:
-        default: Environment type
       SupportsConfig:
         default: Use AWS Config
       AvailabilityZones:
@@ -27,10 +24,6 @@ Metadata:
       DomainName:
         default: Custom FQDN of CloudFront distribution
 Parameters:
-  EnvType:
-    Description: Runtime environment type.
-    Default: dev
-    Type: String
   AppBucketName:
     Type: String
     Description: A legal bucket name.  Must not exist.
@@ -76,12 +69,16 @@ Parameters:
     Type: String
     Description: File system id of EfsFileSystem
     Default: ""
-  ApiCustomDomain:
+  CustomDomainName:
     Type: String
-    Description: Custom domain for the API endpoint. Be sure to include the trailing dot.
-  ApiCertificateArn:
+    Description: FQDN of the API custom domain
+    Default: ""
+  Stage:
     Type: String
-    Description: ARN of the SSL certificate for the API domain name
+    Description: API stage name
+    Default: "$default"
+    MaxLength: 128
+    AllowedPattern: "(\\$default|[a-zA-Z_0-9]*)"
 
 Conditions:
   LoadConfigRulesTemplate: !Equals [!Ref SupportsConfig, 'true']
@@ -93,7 +90,6 @@ Resources:
       Location: vpc.template.yaml
       Parameters:
         StackName: !Ref AWS::StackName
-        EnvType: !Ref EnvType
         RegionAZ1Name:
           !Select
           - 0
@@ -113,7 +109,6 @@ Resources:
       Location: efs.template.yaml
       Parameters:
         StackName: !Ref AWS::StackName
-        EnvType: !Ref EnvType
         VpcId: !GetAtt [VpcTemplate, Outputs.VpcId]
         Subnets: !GetAtt [VpcTemplate, Outputs.SubnetIds]
         FileSystemId: !Ref FileSystemId
@@ -133,12 +128,10 @@ Resources:
         EfsSecurityGroup: !GetAtt [EfsTemplate, Outputs.EfsSecurityGroupId]
         AccessPointId: !GetAtt [EfsTemplate, Outputs.AccessPointId]
         AccessPointArn: !GetAtt [EfsTemplate, Outputs.AccessPointArn]
-        EnvType: !Ref EnvType
         SlidesBucketName: !Ref SlidesBucketName
         PublishBucketName: !Ref PublishBucketName
-        ApiCustomDomain: !Ref ApiCustomDomain
-        HostedZoneName: !Ref HostedZoneName
-        ApiCertificateArn: !Ref ApiCertificateArn
+        CustomDomainName: !Ref CustomDomainName
+        Stage: !Ref Stage
   WebTemplate:
     Type: AWS::Serverless::Application
     DependsOn:
@@ -146,7 +139,6 @@ Resources:
     Properties:
       Location: web.template.yaml
       Parameters:
-        EnvType: !Ref EnvType
         AppBucketName: !Ref AppBucketName
         DomainName: !Ref DomainName
         HostedZoneName: !Ref HostedZoneName

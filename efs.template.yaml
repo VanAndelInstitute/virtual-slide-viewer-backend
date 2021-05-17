@@ -11,10 +11,6 @@ Parameters:
   Subnets:
     Type: CommaDelimitedList
     Description: 'The list of Subnet IDs, for at least two Availability Zones in the region in your Virtual Private Cloud (VPC)'
-  EnvType:
-    Description: Runtime environment type.
-    Default: dev
-    Type: String
   FileSystemId:
     Type: String
     Description: File system id of EfsFileSystem

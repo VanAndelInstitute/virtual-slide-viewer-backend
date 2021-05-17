@@ -26,10 +26,6 @@ Parameters:
   StackName:
     Description: Name of the parent of this nested stack.
     Type: String
-  EnvType:
-    Description: Runtime environment type.
-    Default: dev
-    Type: String
   RegionAZ1Name:
     Description: Availability Zone 1 Name in Region
     Type: String
@@ -56,8 +52,6 @@ Resources:
       Tags:
       - Key: Name
         Value: !Ref StackName
-      - Key: EnvType
-        Value: !Ref EnvType
   RouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -93,8 +87,6 @@ Resources:
       Tags:
       - Key: Name
         Value: Subnet A
-      - Key: EnvType
-        Value: !Ref EnvType
   SubnetB:
     Type: AWS::EC2::Subnet
     Properties:
@@ -104,8 +96,6 @@ Resources:
       Tags:
       - Key: Name
         Value: Subnet B
-      - Key: EnvType
-        Value: !Ref EnvType
   RouteAssocA:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:

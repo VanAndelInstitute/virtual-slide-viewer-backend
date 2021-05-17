@@ -26,33 +26,26 @@ Parameters:
   AccessPointArn:
     Type: String
     Description: ARN of AccessPoint
-  EnvType:
-    Type: String
-    Description: Runtime environment type.
-    Default: prod
   SlidesBucketName:
     Type: String
     Description: Name of the bucket for uploading slides.
   PublishBucketName:
     Type: String
     Description: Name of the bucket for making slides public.
-  ApiCustomDomain:
+  CustomDomainName:
     Type: String
-    Description: Custom domain for the API endpoint
-  HostedZoneName:
+    Description: FQDN of the API custom domain
+  Stage:
     Type: String
-    Description: Name of the Route 53 hosted zone
-  ApiCertificateArn:
-    Type: String
-    Description: ARN of the SSL certificate for the API domain name
+    Description: API stage name
 
 Globals:
   Api:
     OpenApiVersion: '3.0.3'
-  Function:
-    Environment:
-      Variables:
-        ENV_TYPE: !Ref EnvType
+
+Conditions:
+  HaveCustomDomain: !Not [!Equals [!Ref CustomDomainName, ""]]
+  DefaultStage: !Equals [!Ref Stage, "$default"]
 
 Resources:
   SlidesBucket:
@@ -93,7 +86,17 @@ Resources:
       Environment:
         Variables:
           FS_PATH: !Sub '/mnt/${FileSystemId}'
-          API_PATH: !Sub https://${ApiCustomDomain}/${EnvType}/image-service/
+          API_PATH: !If
+            - HaveCustomDomain
+            - !If
+              - DefaultStage
+              - !Sub https://${CustomDomainName}/image-service/
+              - !Sub https://${CustomDomainName}/${Stage}/image-service/
+            - !If
+              - DefaultStage
+              - !Sub https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/image-service/
+              - !Sub https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/${Stage}/image-service/
+          BUCKET_NAME: !Ref SlidesBucketName
       Layers:
         - !Ref OpenSlide
         - !Ref PillowSIMD
@@ -109,10 +112,10 @@ Resources:
           - Arn: !Ref AccessPointArn
             LocalMountPath: !Sub '/mnt/${FileSystemId}'
       Events:
-        ImagesApi:
-          Type: Api
+        HttpApi:
+          Type: HttpApi
           Properties:
-            RestApiId: !Ref ImagesApi
+            ApiId: !Ref HttpApi
             Path: /image-service/{imagePath+}
             Method: GET
   ImportSlide:
@@ -189,10 +192,10 @@ Resources:
         - LambdaInvokePolicy:
             FunctionName: !Ref DeleteFileAsync
       Events:
-        ImagesApi:
-          Type: Api
+        HttpApi:
+          Type: HttpApi
           Properties:
-            RestApiId: !Ref ImagesApi
+            ApiId: !Ref HttpApi
             Path: /Files
             Method: DELETE
   PublishSlides:
@@ -213,10 +216,10 @@ Resources:
         - S3WritePolicy:
             BucketName: !Ref PublishBucketName
       Events:
-        ImagesApi:
-          Type: Api
+        HttpApi:
+          Type: HttpApi
           Properties:
-            RestApiId: !Ref ImagesApi
+            ApiId: !Ref HttpApi
             Path: /PublishSlides
             Method: PUT
   S3Endpoint:
@@ -269,27 +272,33 @@ Resources:
         - python3.8
     Metadata:
       BuildMethod: makefile
-  ImagesApi:
-    Type: AWS::Serverless::Api
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
     Properties:
-      Name: !Ref StackName
-      StageName: !Ref EnvType
-      BinaryMediaTypes: ['image/*']
-      EndpointConfiguration:
-        Type: REGIONAL
-      Domain:
-        DomainName: !Ref ApiCustomDomain
-        CertificateArn: !Ref ApiCertificateArn
-        EndpointConfiguration: REGIONAL
-        Route53:
-          HostedZoneName: !Ref HostedZoneName
-        BasePath:
-          - !Ref EnvType
+      StageName: !Ref Stage
+  ApiMapping:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Condition: HaveCustomDomain
+    DependsOn:
+      - HttpApiStage
+    Properties: 
+      ApiId: !Ref HttpApi
+      DomainName: !Ref CustomDomainName
+      Stage: !Ref Stage
 
 Outputs:
   ApiId:
-    Description: Api id of ImagesApi
-    Value: !Ref ImagesApi
+    Description: Api id of HttpApi
+    Value: !Ref HttpApi
   ApiUrl:
-    Description: URL of your API endpoint
-    Value: !Sub https://${ApiCustomDomain}/${EnvType}/
+    Description: URL of the API endpoint
+    Value: !If
+      - HaveCustomDomain
+      - !If
+        - DefaultStage
+        - !Sub https://${CustomDomainName}/
+        - !Sub https://${CustomDomainName}/${Stage}/
+      - !If
+        - DefaultStage
+        - !Sub https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/
+        - !Sub https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/${Stage}/
