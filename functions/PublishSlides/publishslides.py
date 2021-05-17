@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 import json
 
-ARCHIVE_BUCKET = os.environ.get('ARCHIVE_BUCKET')
+SLIDES_BUCKET = os.environ.get('SLIDES_BUCKET')
 PUBLISH_BUCKET = os.environ.get('PUBLISH_BUCKET')
 
 s3_client = boto3.client('s3')
@@ -19,7 +19,7 @@ def lambda_handler(event, context):
         try:
             # upload to S3
             copy_source = {
-                'Bucket': ARCHIVE_BUCKET,
+                'Bucket': SLIDES_BUCKET,
                 'Key': event['Filename']
             }
             extra_args = {
