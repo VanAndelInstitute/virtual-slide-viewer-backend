@@ -276,6 +276,10 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       StageName: !Ref Stage
+      CorsConfiguration:
+        AllowMethods: [GET]
+        AllowOrigins: ['*']
+
   ApiMapping:
     Type: AWS::ApiGatewayV2::ApiMapping
     Condition: HaveCustomDomain
