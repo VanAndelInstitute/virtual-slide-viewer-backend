@@ -1,3 +1,5 @@
+**This repository is now obsolete. See https://github.com/VanAndelInstitute/s3vs**
+
 # Backend for Virtual Slide Viewer
 The VSV backend is implemented as an AWS Serverless application. It mounts an EFS share with SVS files into a Lambda function and handles API Gateway requests for [IIIF](https://iiif.io/api/image/3.0/) tiles by using [OpenSlide Python](https://openslide.org/api/python/) to fetch TIFF tiles and [Pillow-SIMD](https://github.com/uploadcare/pillow-simd) to shrink tiles as needed.
 
